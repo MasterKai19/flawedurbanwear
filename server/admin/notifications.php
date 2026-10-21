@@ -1,0 +1,48 @@
+<?php
+require dirname(__DIR__).'/app/bootstrap.php';require_admin();require dirname(__DIR__).'/app/notifications.php';
+$error='';$generated='';
+if($_SERVER['REQUEST_METHOD']==='POST'){
+ check_csrf();$action=(string)($_POST['action']??'');
+ try{
+  if($action==='install'){db()->exec(file_get_contents(dirname(__DIR__).'/database/notifications.sql'));flash('Notification queue installed. New orders will be queued.');redirect('admin/notifications.php');}
+  if($action==='generate'){$generated=bin2hex(random_bytes(32));}
+  if($action==='save'){
+   $endpoint=trim((string)($_POST['webhook_url']??''));$secret=trim((string)($_POST['secret']??''));$enabled=isset($_POST['enabled']);
+   if($endpoint!==''&&!valid_google_url($endpoint))throw new DomainException('Use the Google Apps Script HTTPS deployment URL ending in /exec.');
+   if($secret!==''&&!preg_match('/^[a-f0-9]{64}$/i',$secret))throw new DomainException('Use the 64-character generated secret.');
+   if($secret==='')$secret=(string)setting('google_secret');
+   if($enabled&&(!$endpoint||strlen($secret)<32||!notifications_installed()))throw new DomainException('Install the queue, enter the deployment URL and secret before enabling.');
+   db()->beginTransaction();foreach(['google_webhook_url'=>$endpoint,'google_secret'=>$secret,'google_enabled'=>$enabled?'1':'0'] as $k=>$v)query('INSERT INTO settings(name,value) VALUES(?,?) ON DUPLICATE KEY UPDATE value=VALUES(value)',[$k,$v]);db()->commit();flash('Google connection settings saved. Use Send test email to verify the deployment.');redirect('admin/notifications.php');
+  }
+  if($action==='test'){
+   if(!notifications_ready())throw new DomainException('Save and enable the connection first.');
+   $result=google_request(['event'=>'connection.test','version'=>1]);
+   if(($result['ok']??false)!==true||($result['test_email_sent']??false)!==true)throw new DomainException('Connection test failed. Check Script Properties, authorization, deployment access and email quota.');
+   flash('Google confirmed the Sheet connection and accepted a test email to '.FLAWED_OWNER_EMAIL.'. Check your inbox and spam folder.');redirect('admin/notifications.php');
+  }
+  if($action==='retry'){
+   if(!notifications_ready())throw new DomainException('Configure and enable Google first.');
+   $id=(int)($_POST['order_id']??0);query("UPDATE order_notifications SET attempts=0,next_attempt_at=NULL WHERE order_id=? AND status<>'sent' AND (lease_until IS NULL OR lease_until<NOW())",[$id]);
+   $sent=notification_send($id);flash($sent?'Sheet and email notifications completed.':'Not completed. Check the queue details below.');redirect('admin/notifications.php');
+  }
+  if($action==='retry_due'){
+   if(!notifications_ready())throw new DomainException('Configure and enable Google first.');
+   $rows=query("SELECT order_id FROM order_notifications WHERE status<>'sent' AND attempts<10 AND (lease_until IS NULL OR lease_until<NOW()) AND (next_attempt_at IS NULL OR next_attempt_at<=NOW()) ORDER BY id LIMIT 1")->fetchAll();$count=0;foreach($rows as $row)if(notification_send((int)$row['order_id']))$count++;
+   flash($count.' order notification(s) completed.');redirect('admin/notifications.php');
+  }
+ }catch(DomainException|RuntimeException $e){if(db()->inTransaction())db()->rollBack();$error=$e->getMessage();}
+}
+$installed=notifications_installed();$ready=$installed&&notifications_ready();$page=max(1,(int)($_GET['page']??1));$total=$installed?(int)query('SELECT COUNT(*) FROM order_notifications')->fetchColumn():0;
+$rows=$installed?query('SELECT n.*,o.reference,o.email FROM order_notifications n JOIN orders o ON o.id=n.order_id ORDER BY n.id DESC LIMIT 30 OFFSET '.(($page-1)*30))->fetchAll():[];
+render_header('Google & email',true);
+?>
+<main class="page"><p class="eyebrow">ORDER NOTIFICATIONS</p><h1>Stay in the loop.</h1><p>New orders → your Google Sheet → owner email → customer acknowledgment.</p><p>Owner email: <strong><?=h(FLAWED_OWNER_EMAIL)?></strong> · Connection: <strong><?=$ready?'Enabled — use test to verify':'Not active'?></strong></p>
+<?php if($error):?><div class="notice error" role="alert"><?=h($error)?></div><?php endif ?>
+<?php if(!$installed):?><section class="summary-box"><h2>Install the notification queue</h2><p>This adds one table to your store without changing existing orders. Only new orders placed after installation are queued; older customers will not receive surprise emails.</p><form method="post"><?=csrf_input()?><input type="hidden" name="action" value="install"><button class="button dark">INSTALL NOTIFICATION QUEUE</button></form></section><?php endif ?>
+<div class="checkout-layout"><section><h2>Connect your Google account</h2><ol class="setup-steps"><li>Create a private Google Sheet while signed in to <strong>urbanwearflawed@gmail.com</strong>.</li><li>Open Extensions → Apps Script. Paste the supplied <strong>integrations/google-apps-script/Code.gs</strong> file.</li><li>In Script Properties, set <strong>SPREADSHEET_ID</strong> to the ID from your Sheet URL and <strong>WEBHOOK_SECRET</strong> to a generated secret below.</li><li>Run <strong>authorizeAndPrepare</strong> in Apps Script and authorize Sheets and sending mail.</li><li>Deploy as a Web app: Execute as <strong>Me</strong>; access <strong>Anyone</strong>. Your Sheet remains private; the endpoint requires the secret. Copy the deployment URL ending in <strong>/exec</strong>.</li><li>Save the matching URL and secret here, enable the connection, and send a test email.</li></ol>
+<form method="post"><?=csrf_input()?><input type="hidden" name="action" value="generate"><button class="button outline">GENERATE A SHARED SECRET</button></form>
+<?php if($generated):?><label>New secret — copy to Google Script Properties and the form below<input readonly value="<?=h($generated)?>" autocomplete="off"></label><p class="hint">This new secret has not been saved yet. Keep it private. Do not paste it into chat.</p><?php endif ?>
+<form method="post" autocomplete="off"><?=csrf_input()?><input type="hidden" name="action" value="save"><label>Apps Script deployment URL<input type="url" name="webhook_url" value="<?=h(setting('google_webhook_url'))?>" placeholder="https://script.google.com/macros/s/.../exec"></label><label>Shared secret<input type="password" name="secret" autocomplete="new-password" placeholder="<?=setting('google_secret')?'Already saved — leave blank to keep':'Paste the generated 64-character secret'?>" pattern="[a-fA-F0-9]{64}"></label><label class="check-label"><input type="checkbox" name="enabled" value="1" <?=setting('google_enabled')==='1'?'checked':''?>>Enable Sheet updates and emails for new orders</label><button class="button dark">SAVE CONNECTION</button></form></section>
+<aside class="summary-box"><h2>Verify your connection</h2><p>The test checks access to the Sheet and sends one clearly labeled test email to <?=h(FLAWED_OWNER_EMAIL)?>. It does not create a customer order.</p><form method="post"><?=csrf_input()?><input type="hidden" name="action" value="test"><button class="button dark" <?=$ready?'':'disabled'?>>SEND TEST EMAIL</button></form><h2 class="spaced">Reliable order capture</h2><p>Orders are saved in MySQL first. Google errors do not cancel an order. Failed notifications remain below for retry; the Sheet uses the order reference to avoid duplicate rows.</p><p>Emails go to customers only if they supplied an email. Google daily quotas apply. This records new-order snapshots; later admin status edits do not update the Sheet.</p><p class="hint">Keep the “Flawed Orders” tab and sent-status columns intact. Do not sort partial columns or delete rows while retries are pending.</p></aside></div>
+<div class="section-head spaced"><h2>Notification queue</h2><?php if($ready):?><form method="post"><?=csrf_input()?><input type="hidden" name="action" value="retry_due"><button class="button outline">PROCESS NEXT DUE ORDER</button></form><?php endif ?></div>
+<div class="table-wrap"><table><thead><tr><th>Order</th><th>Status</th><th>Sheet</th><th>Owner email</th><th>Customer email</th><th>Attempts / detail</th><th>Action</th></tr></thead><tbody><?php foreach($rows as $r):?><tr><td><a href="<?=url('admin/order.php?id='.$r['order_id'])?>"><?=h($r['reference'])?></a></td><td><?=h($r['status'])?></td><td><?=$r['sheet_logged']?'Logged':'Pending'?></td><td><?=$r['owner_emailed']?'Accepted by Google':'Pending'?></td><td><?=$r['email']===''?'No email supplied':($r['customer_emailed']?'Accepted by Google':'Pending')?></td><td><?=h($r['attempts'])?><br><small><?=h($r['last_error'])?></small></td><td><?php if($r['status']!=='sent'&&$ready):?><form method="post"><?=csrf_input()?><input type="hidden" name="action" value="retry"><input type="hidden" name="order_id" value="<?=h($r['order_id'])?>"><button class="text-button">RETRY</button></form><?php endif ?></td></tr><?php endforeach ?></tbody></table></div><?php if(!$rows):?><p>No notifications queued yet.</p><?php endif ?><div class="pagination"><?php if($page>1):?><a href="?page=<?=$page-1?>">← Previous</a><?php endif ?><span>Page <?=$page?></span><?php if($page*30<$total):?><a href="?page=<?=$page+1?>">Next →</a><?php endif ?></div></main><?php render_footer(); ?>

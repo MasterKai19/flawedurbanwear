@@ -1,0 +1,18 @@
+import fs from 'node:fs';import vm from 'node:vm';import assert from 'node:assert/strict';
+const data=[];const mail=[];let quota=100,failCustomer=false;
+const range=(row,col,rows=1,cols=1)=>({setFontWeight(){return this},setBackground(){return this},setFontColor(){return this},getValue(){return data[row-1]?.[col-1]??''},setValue(v){data[row-1][col-1]=v;return this},createTextFinder(text){return{matchEntireCell(){return this},useRegularExpression(){return this},findNext(){const n=data.findIndex((r,i)=>i>=row-1&&i<row-1+rows&&r[col-1]===text);return n<0?null:{getRow:()=>n+1}}}}});
+const sheet={appendRow:r=>data.push(r),setFrozenRows(){},setColumnWidth(){},getRange:range,getLastRow:()=>data.length};let exists=false;
+const ctx=vm.createContext({PropertiesService:{getScriptProperties:()=>({getProperty:k=>({WEBHOOK_SECRET:'a'.repeat(64),SPREADSHEET_ID:'test-sheet'})[k]})},SpreadsheetApp:{openById:()=>({getSheetByName:()=>exists?sheet:null,insertSheet:()=>{exists=true;return sheet}}),flush(){}},MailApp:{getRemainingDailyQuota:()=>quota,sendEmail:m=>{if(failCustomer&&m.to==='customer@example.test')throw Error('simulated failure');mail.push(m);}},LockService:{getScriptLock:()=>({tryLock:()=>true,releaseLock(){}})},ContentService:{MimeType:{JSON:'json'},createTextOutput:s=>({setMimeType:()=>JSON.parse(s)})}});
+vm.runInContext(fs.readFileSync('flawed-vercel/server/integrations/google-apps-script/Code.gs','utf8'),ctx);
+const order={reference:'FL-123456789A',created_at:'2026-10-18 00:00:00',customer_name:'=FORMULA()',phone:'01712345678',email:'customer@example.test',address:'Test address only',area:'dhaka',notes:'@formula',subtotal:500,delivery_fee:null,total:null,payment_method:'cod',payment_status:'unpaid',status:'pending',items:[{product_name:'Living Tee',size:'M',quantity:1,unit_price:500}]};
+const send=(o=order,secret='a'.repeat(64))=>ctx.doPost({postData:{contents:JSON.stringify({secret,event:'order.created',event_id:o.reference,order:o})}});
+assert.equal(send(order,'wrong').error,'unauthorized');assert.equal(data.length,0);assert.equal(mail.length,0);
+let r=send();assert.equal(r.ok,true);assert.equal(data.length,2);assert.equal(mail.length,2);assert.equal(mail[0].to,'urbanwearflawed@gmail.com');assert.equal(data[1][2],"'=FORMULA()");assert.equal(data[1][3],"'01712345678");assert.equal(data[1][8],500);
+assert.equal(send().ok,true);assert.equal(data.length,2);assert.equal(mail.length,2);
+failCustomer=true;const next={...order,reference:'FL-123456789B'};r=send(next);assert.equal(r.ok,false);assert.equal(r.owner_emailed,true);assert.equal(r.customer_emailed,false);assert.equal(mail.length,3);
+failCustomer=false;assert.equal(send(next).ok,true);assert.equal(mail.length,4);assert.equal(data.length,3);
+quota=0;r=send({...order,reference:'FL-123456789C'});assert.equal(r.error,'mail_quota');assert.equal(r.sheet_logged,true);assert.equal(mail.length,4);
+quota=100;assert.equal(send({...order,reference:'FL-123456789C'}).ok,true);assert.equal(data.length,4);
+r=send({...order,reference:'FL-123456789D',email:''});assert.equal(r.ok,true);assert.equal(r.customer_emailed,false);assert.equal(mail.length,7);
+assert.equal(send({...order,email:'victim@example.com,other@example.com'}).error,'invalid_order');
+console.log('PASS: Google script validation, authentication, sheet creation, numeric columns, formula/phone protection, owner/customer email, duplicate suppression, partial email retry, quota recovery and optional customer email. No real emails sent.');

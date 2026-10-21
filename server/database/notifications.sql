@@ -1,0 +1,16 @@
+CREATE TABLE IF NOT EXISTS order_notifications (
+ id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+ order_id BIGINT UNSIGNED NOT NULL UNIQUE,
+ status VARCHAR(20) NOT NULL DEFAULT 'pending',
+ attempts INT UNSIGNED NOT NULL DEFAULT 0,
+ last_error VARCHAR(255) NULL,
+ sheet_logged TINYINT NOT NULL DEFAULT 0,
+ owner_emailed TINYINT NOT NULL DEFAULT 0,
+ customer_emailed TINYINT NOT NULL DEFAULT 0,
+ next_attempt_at DATETIME NULL,
+ lease_until DATETIME NULL,
+ created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ sent_at DATETIME NULL,
+ FOREIGN KEY (order_id) REFERENCES orders(id),
+ INDEX notification_retry(status,next_attempt_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

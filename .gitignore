@@ -1,4 +1,8 @@
-/app/config.php
-/assets/uploads/*
-!/assets/uploads/.htaccess
+.env
+.env.*
+!.env.example
+.vercel
+node_modules
 *.log
+*.zip
+*-backup.sql

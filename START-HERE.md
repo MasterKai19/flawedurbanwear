@@ -1,90 +1,125 @@
-# Flawed Urbanwear — XAMPP / PHP + MySQL
+# Flawed Urbanwear — Vercel edition
 
-An online-only streetwear store, established in 2023. The Living Tee is the first product, priced at BDT 500. Add more products from the admin dashboard. The supplied logo is used in the header and footer; the campaign photo has been cleaned of its old year and offline-store wording.
+This is the complete website, not an update for the XAMPP folder. Keep its folders together.
+The storefront, product galleries, categories, SOLD OUT ribbons, cart, checkout and admin pages are included.
+You do not need InfinityFree or a running home computer.
 
-## Run in XAMPP
+## What you need
 
-1. Extract this folder into your XAMPP `htdocs` folder and rename it `flawed`. Your installation was found at `D:\SOFTWARE\xamp`, so the expected destination is `D:\SOFTWARE\xamp\htdocs\flawed`.
-2. Start Apache and MySQL in XAMPP.
-3. Open phpMyAdmin and create an empty database called `flawed_store`, with `utf8mb4_unicode_ci` collation. You do not need to import SQL manually: setup creates the tables.
-4. Check `app/config.php`. It is already included and set to your detected XAMPP MySQL port **3307**, database `flawed_store`, username `root`, and an empty password. Change credentials if yours differ. `config.example.php` uses the standard port 3306 for other machines. Keep `base_path` as `/flawed` if that is the folder name.
-5. Open `http://localhost/flawed/setup.php`. Choose your own admin email and a password of at least 12 characters. Setup adds the initial Living Tee and then locks itself. No default admin account or test orders are shipped.
-6. Sign in at `http://localhost/flawed/admin/`. Set real delivery fees in Settings and confirm the product sizes and available stock in Products.
-7. Visit `http://localhost/flawed/` and place a test order. It appears in the admin Orders page.
+1. A Vercel **Pro** account for a commercial shop. Vercel Hobby is for personal, non-commercial use.
+2. A cloud **MySQL** database with remote connections and a CA certificate. Aiven for MySQL is one option with a free database tier.
+3. Your Google account, Sheet and Apps Script deployment for order emails and Sheet copies.
 
-If Apache uses a different port, include it in the URL, for example `http://localhost:8080/flawed/`.
+Vercel runs the website using the pinned community PHP runtime. MySQL stores products, orders, stock, login sessions and new product photos. Original product images are deployed with the website. Google sends the email notifications to **urbanwearflawed@gmail.com**.
+The website can accept orders even if Google is temporarily unavailable; its SQL queue preserves notification work for retries.
 
-The files must run through PHP/Apache. Double-clicking an HTML file cannot run checkout, sessions or MySQL. PHP 8.1+ with PDO MySQL and Fileinfo is required; verified with XAMPP PHP 8.2.12 and MariaDB 10.4.32.
+## 1. Create the cloud database
 
-## What works
+Create a MySQL service, for example at https://aiven.io/free-mysql-database.
+Copy its host, port, database name, username and password. Download the service's CA certificate.
+Use the actual port displayed by the provider; it may not be 3306. Use a dedicated empty database for this store.
+Do not use the old InfinityFree database or XAMPP credentials.
 
-- Brand homepage, responsive layout, product catalog, front/back image views and size selection.
-- Server-session cart, quantity editing, Add to Bag, Buy Now and checkout.
-- SQL order records, item/price snapshots, customer and delivery details, private order-status page.
-- Cash-on-delivery order requests. Google Sheets logging, owner emails to urbanwearflawed@gmail.com and customer acknowledgments are implemented; activate them with GOOGLE-SETUP.md. SMS is not included.
-- Admin login, product creation/editing, images, visible/hidden products, sizes and stock.
-- Admin order filters, status changes, agreed delivery fee, manually verified payment status and CSV export.
-- Prices and totals calculated on the server; duplicate checkout requests do not create extra orders.
-- Stock reserved transactionally on ordering, and returned once when an unshipped order is cancelled.
-- CSRF protection, password hashing, prepared SQL queries, session regeneration and login attempt throttling.
+## 2. Deploy this entire folder
 
-Stock is initially **untracked**, because no actual inventory quantities were supplied. Blank stock means untracked; 0 means sold out. Removing a size from a product makes it sold out. Keep tracked stock modes consistent while there are pending orders, and enter the currently available quantity after existing reservations. New items do not affect old order price snapshots.
+Option A — GitHub:
+- Create a private GitHub repository and upload this folder's **contents**, preserving all subfolders and dotfiles.
+- In Vercel, choose Add New Project, import the repository, and select framework **Other**.
+- The project root is the folder containing **vercel.json**, **api**, **assets**, and **server**.
+- Use Node.js **22.x**. Do not enter a frontend build command or choose an output directory.
+- Add the environment variables below, then deploy.
 
-Delivery fees initially await confirmation. Set actual Dhaka/outside-Dhaka charges in Admin → Settings. A blank fee requires agreement with the customer before dispatch; zero means free delivery. Updating store rates does not alter old orders. Edit an existing order to set its agreed fee.
+Option B — terminal:
+- Open a terminal inside this folder and run `npx vercel`.
+- Sign in and choose/create your project, with framework Other.
+- Add the environment variables in the Vercel dashboard.
+- Run `npx vercel --prod` after adding them.
+- The first deployment may show a setup error until the database variables are saved and redeployed.
 
-Order flow: pending → confirmed → processing → shipped → delivered. Pending, confirmed and processing orders may be cancelled. Shipped/delivered orders cannot be cancelled through this initial workflow. Returns/refunds are handled manually; no automated refund system is included. A cancelled order cannot be reopened.
+### Vercel → Project → Settings → Environment Variables
 
-## Your computer and future public hosting
+| Name | Value |
+|---|---|
+| `DB_HOST` | Cloud MySQL hostname |
+| `DB_PORT` | Cloud MySQL port |
+| `DB_NAME` | Database name, for example `defaultdb` if that is what the provider shows |
+| `DB_USER` | Cloud MySQL username |
+| `DB_PASSWORD` | Cloud MySQL password |
+| `DB_SSL_CA` | Entire downloaded CA certificate text, including BEGIN and END lines |
+| `OWNER_EMAIL` | Your private admin login email |
+| `OWNER_PASSWORD` | Your private admin password, at least 12 characters |
+| `CRON_SECRET` | A different random secret of at least 32 characters |
 
-Currently the store is local. Your friends cannot open your `localhost` URL from their devices.
+Generate your owner password and cron secret locally with `node tools/create-secrets.mjs`, or use your password manager.
+Enter secrets directly in Vercel. Do not put them in source files, GitHub or chat.
+Save these variables for **Production**. Use a separate test database for Preview deployments, or leave Preview unconfigured.
+After changing variables, redeploy so they take effect.
 
-To make the store public, upload this PHP project to compatible PHP/MySQL hosting and use a database on that host. You can then open `https://your-domain/admin/` from your computer to see and manage all online orders. CSV export saves a copy of order information to your computer. Orders do **not** automatically sync into a separate local XAMPP database; the hosted database is the live source of truth.
+## 3. Open your store
 
-### Upload to PHP/MySQL hosting (such as InfinityFree)
+Open your deployment URL. The first request creates the tables, imports all 12 products and 46 size variants, and creates the owner account from OWNER_EMAIL and OWNER_PASSWORD. No setup page or SETUP_KEY is needed.
 
-1. Create the hosting account/domain and MySQL database. Use the database host and credentials provided by the host, not local root credentials.
-2. Upload the project files to the public website folder, including `.htaccess` files. Do not upload local database server files, logs, backups or tests.
-3. Set `app/config.php` to the hosted credentials. Set `base_path` to `''` for the domain root, or `/flawed` if deployed in that subfolder.
-4. To preserve existing local products/orders/admin, export the local database with phpMyAdmin and import it into the host's database; also copy `assets/uploads`. Do not run first-time setup against that imported database.
-5. For a fresh database, set a long random `setup_key` in private config, visit `/setup.php`, provide the key and create the admin account. Clear the setup key afterwards. Setup locks after an admin exists; you may remove `setup.php` after installation.
-6. Enable HTTPS, verify that `/database/schema.sql` and `/app/` are denied, and test checkout and admin before sharing the store.
-7. Keep database exports and product uploads backed up outside the public website folder.
+Sign in at `/admin/` using those owner details. OWNER_PASSWORD is used only to create the first owner; changing it later does not reset an existing account. You may remove it from Vercel after successful initialization and redeploy. Keep the password in your password manager.
 
-InfinityFree advertises PHP/MySQL support, making this structure suitable for that hosting type. Free-host restrictions and payment-provider requirements must be checked before using real online payments. Vercel is not a drop-in XAMPP host: it uses function runtimes, PHP is a community runtime, and you would need an external database plus changes for persistent sessions/uploads. This project is intentionally packaged for Apache/PHP/MySQL hosting.
+Initialization is locked against concurrent requests and records completion in the database. Later deployments preserve inventory, accounts and orders, even if you remove products from the catalog.
 
-References: https://www.infinityfree.com/ and https://vercel.com/docs/functions/runtimes
+Check stock before launch: the supplied snapshot has LOST L = 1 and PASSION L = 3; all other sizes are sold out. Review delivery fees in Settings.
+Existing local orders/accounts are not migrated automatically. Do not import local test databases.
 
-## bKash: prepared extension point, not live
+You may alternatively supply MYSQL_URL or DATABASE_URL (a MySQL URL, not PostgreSQL) instead of the five DB connection fields. DB_SSL_CA is still required for remote connections. Use your provider's actual details; connecting an integration only works automatically if it supplies these names. A connection URL must percent-encode special characters in credentials. Explicit DB_* variables override URL fields.
 
-`app/payments.php` contains a disabled gateway interface for a later integration. It deliberately throws if used. The checkout always uses COD and never pretends a bKash payment succeeded. `bkash_enabled` is reserved configuration and does not activate payments by itself.
+## 4. Connect order notifications
 
-Once you have merchant API access, the next integration must:
+Follow **GOOGLE-SETUP.md** in this folder.
+Connect your private Google Sheet, authorize the Apps Script, and save its deployment URL and shared secret under Admin → Settings → Connect Google & Email.
+Click **Send test email** and confirm receipt at urbanwearflawed@gmail.com.
+Use a new shared secret rather than one previously pasted into chat.
 
-1. Store merchant credentials in private server configuration/environment, not browser code.
-2. Create a payment using the order amount already saved in SQL.
-3. Redirect to the official bKash checkout; never collect wallet PINs or OTPs on this site.
-4. Record a unique provider payment ID tied to an order.
-5. Execute/query the payment server-side and verify the payment ID, amount, currency and completed status before marking paid. A return URL saying success is not proof of payment.
-6. Handle retries, cancellation, uncertain execution, refunds and duplicate callbacks idempotently.
-7. Test with bKash sandbox credentials and confirm the hosting provider permits required outbound HTTPS requests before enabling live payments.
+After connection:
+- Checkout saves an order and reserves available stock in one SQL transaction.
+- Google Sheets and email are attempted immediately after the transaction commits.
+- Vercel Cron checks pending notification work each minute in **Production**. CRON_SECRET authenticates the request.
+- Each run handles one due order. Failures retry after five minutes, up to ten attempts.
+- Admin → Notifications shows successes and failures and lets you retry manually.
+- Google quotas still apply. Delivery is not guaranteed until a live test succeeds.
+- The Sheet is an order-receipt log; later admin status changes are managed in the website, not synchronized back to the Sheet.
 
-Merchant credentials, API implementation, sandbox certification and activation are not included in this version because you asked to prepare bKash for later.
+## 5. Open the admin on your phone
 
-## File map
+Open `https://YOUR-PROJECT.vercel.app/admin/`, sign in, and bookmark it.
+You can view orders, update their status, change stock and prices, and upload product photos from your phone.
+Refresh the Orders page to see new orders. Email notifications can appear on your phone through Gmail if Gmail notifications are enabled.
+No separate mobile app or direct database connection is needed.
 
-- `index.php`, `product.php`: homepage and catalog product page.
-- `cart.php`, `checkout.php`, `order.php`: shopping and order flow.
-- `admin/`: protected product/order/settings dashboard and CSV export.
-- `app/bootstrap.php`: database connection, session, security and shared page layout.
-- `app/config.example.php`: configuration template.
-- `app/payments.php`: disabled future payment gateway interface.
-- `database/schema.sql`: MySQL/MariaDB schema.
-- `assets/`: CSS, JavaScript, supplied product images, cleaned campaign image and logo.
+Photo uploads must be PNG, JPEG or WebP, at most 3 MB **combined per save**. They are stored in MySQL and survive redeployments.
+Monitor database storage as your image library grows; a large catalog should use dedicated object storage.
+bKash remains marked Coming Soon. This version accepts cash-on-delivery order requests.
 
-## Verification
+## Before sharing the public link
 
-All PHP files passed PHP syntax checks. End-to-end tests against an isolated MariaDB database passed: first-time setup and setup lock, admin authentication, CSRF checks, stock limits, validation, server-side prices, delivery calculation, stored orders, duplicate submission handling, private status links, stock return on cancellation, product editing and CSV export. The homepage was visually checked in a browser. No live bKash transactions were attempted.
+- Finish setup, review inventory and set delivery rates.
+- Verify a real notification test. Local tests used mock email delivery.
+- Place one clearly labeled test order and verify the admin, Sheet, email and stock deduction.
+- Cancel the test order in Admin to return its reserved stock.
+- Keep the Google Sheet private. Customers only receive their own private order link.
+- Keep database backups and credentials in your hosting account/password manager.
+- Routine redeployments do not overwrite your live database or inventory.
 
-## Google Sheets and email notifications
+## Troubleshooting
 
-See **GOOGLE-SETUP.md** to authorize your Google account and activate the integration. Open Admin → Settings → Connect Google & Email. Code is included, but real delivery requires your private Apps Script deployment and matching shared secret. No Gmail password is needed.
+- **503 / store not ready:** check DB_* variables, port, CA certificate, provider connection availability, then redeploy.
+- **First launch unavailable:** verify OWNER_EMAIL and OWNER_PASSWORD (12+ characters), database variables and CA certificate, then redeploy.
+- **Old setup bookmark:** `/setup.php` now redirects to `/admin/login.php`.
+- **Missing notifications:** check Admin → Notifications, Apps Script deployment access, shared secret, Google quotas and Vercel Cron logs.
+- **Upload too large:** reduce the combined size of the front/back images to under 3 MB.
+- **Local site still works differently:** this is a separate cloud store; XAMPP does not synchronize with it.
+
+## Implementation and verification
+
+Vercel runtime: https://github.com/vercel-community/php
+Database option: https://aiven.io/docs/products/mysql/get-started
+Cron: https://vercel.com/docs/cron-jobs/manage-cron-jobs
+Commercial plan rules: https://vercel.com/docs/limits/fair-use-guidelines
+
+Local integration tests cover protected routes, first-time setup, product/category counts, cross-instance SQL sessions, CSRF rejection, checkout pricing, duplicate checkout handling, stock concurrency, cancellation, and persistent photo uploads.
+Mock notification tests cover queue retries and Google Sheets/email deduplication. A live Vercel build, cloud TLS connection and real email delivery still require your service accounts and credentials.
