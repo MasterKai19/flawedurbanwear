@@ -1,0 +1,4 @@
+/app/config.php
+/assets/uploads/*
+!/assets/uploads/.htaccess
+*.log

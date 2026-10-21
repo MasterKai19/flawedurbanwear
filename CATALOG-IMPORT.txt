@@ -1,0 +1,9 @@
+CATALOG IMPORT
+The supplied CSV is database/products.csv. Original photos are in assets/products.
+The local database has already been imported. Do not re-import after sales unless you intend to reset available quantities to this CSV snapshot.
+On a new installation, finish setup.php first, then run in a terminal:
+php import-catalog.php database/products.csv
+This validates the file without changing products. Back up your database, then run:
+php import-catalog.php database/products.csv --apply
+The importer matches by SKU, reuses the original living-tee product, and leaves orders and accounts intact.
+Edit current prices, sizes and available quantities under Admin > Products.
