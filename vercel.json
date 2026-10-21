@@ -5,5 +5,5 @@
     {"src": "/assets/(.*\\.(?:css|js|png|jpg|jpeg|webp|svg|ico|woff2))", "dest": "/assets/$1"},
     {"src": "/(.*)", "dest": "/api/index.php?__route=$1"}
   ],
-  "crons": [{"path": "/cron/notifications", "schedule": "* * * * *"}]
+  "crons": [{"path": "/cron/notifications", "schedule": "0 0 * * *"}]
 }

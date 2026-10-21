@@ -78,8 +78,8 @@ Use a new shared secret rather than one previously pasted into chat.
 After connection:
 - Checkout saves an order and reserves available stock in one SQL transaction.
 - Google Sheets and email are attempted immediately after the transaction commits.
-- Vercel Cron checks pending notification work each minute in **Production**. CRON_SECRET authenticates the request.
-- Each run handles one due order. Failures retry after five minutes, up to ten attempts.
+- Vercel Cron checks pending notification work once daily at 00:00 UTC in **Production**. CRON_SECRET authenticates the request.
+- Each scheduled run handles one due order. Failed attempts become eligible after five minutes, but the automatic scheduler runs only daily. Use Admin → Notifications to retry sooner; up to ten attempts are allowed.
 - Admin → Notifications shows successes and failures and lets you retry manually.
 - Google quotas still apply. Delivery is not guaranteed until a live test succeeds.
 - The Sheet is an order-receipt log; later admin status changes are managed in the website, not synchronized back to the Sheet.
