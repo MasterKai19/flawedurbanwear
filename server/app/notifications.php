@@ -13,6 +13,23 @@ function telegram_ready(): bool {
     return (bool)preg_match('/^\d+:[A-Za-z0-9_-]{20,}$/D',(string)getenv('TELEGRAM_BOT_TOKEN'))
         && (bool)preg_match('/^-?\d+$/D',(string)getenv('TELEGRAM_CHAT_ID'));
 }
+function telegram_recent_chats(): array {
+    $token=(string)getenv('TELEGRAM_BOT_TOKEN');
+    if(!preg_match('/^\d+:[A-Za-z0-9_-]{20,}$/D',$token))throw new RuntimeException('Save the bot token in Vercel and redeploy first.');
+    $ch=curl_init('https://api.telegram.org/bot'.$token.'/getUpdates');
+    curl_setopt_array($ch,[CURLOPT_RETURNTRANSFER=>true,CURLOPT_FOLLOWLOCATION=>false,CURLOPT_CONNECTTIMEOUT=>5,CURLOPT_TIMEOUT=>12,CURLOPT_SSL_VERIFYPEER=>true,CURLOPT_SSL_VERIFYHOST=>2,CURLOPT_PROTOCOLS=>CURLPROTO_HTTPS,CURLOPT_POST=>true,CURLOPT_POSTFIELDS=>http_build_query(['limit'=>100,'timeout'=>0])]);
+    $body=curl_exec($ch);$status=(int)curl_getinfo($ch,CURLINFO_RESPONSE_CODE);curl_close($ch);
+    $result=is_string($body)?json_decode($body,true):null;
+    if($status!==200||($result['ok']??false)!==true)throw new RuntimeException('Could not look up Telegram chats. Check the token and ensure this bot has no other webhook integration.');
+    $chats=[];
+    foreach($result['result']??[] as $update){
+        $chat=$update['message']['chat']??[];
+        if(($chat['type']??'')!=='private')continue;
+        $id=(string)($chat['id']??'');if(!preg_match('/^\d+$/D',$id))continue;
+        $chats[$id]=['id'=>$id,'name'=>trim(($chat['first_name']??'').' '.($chat['last_name']??'')),'username'=>$chat['username']??''];
+    }
+    return array_values($chats);
+}
 function telegram_order_text(array $payload): string {
     $o=$payload['order'];
     $lines=['Flawed Urbanwear — new order', 'Reference: '.$payload['event_id']];
