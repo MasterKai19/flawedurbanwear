@@ -78,8 +78,8 @@ input:focus,textarea:focus,select:focus,button:focus-visible,a:focus-visible,sum
 @media(hover:hover) and (pointer:fine){
  .product-card:hover .card-image.back-ready .card-back{opacity:1}
  .product-card:hover .card-image.back-ready .card-front{opacity:0}
- body{cursor:url('cursor-cyber.svg') 3 2,auto}
- a,button,summary,.size-choice span,input[type=checkbox],input[type=radio],select{cursor:url('cursor-target.svg') 16 16,pointer}
+ body{cursor:url('cursor-cyber.svg?v=2') 3 2,auto}
+ a,button,summary,.size-choice span,input[type=checkbox],input[type=radio],select{cursor:url('cursor-cyber.svg?v=2') 3 2,auto}
  input:not([type=checkbox]):not([type=radio]),textarea{cursor:text}
  button:disabled,.size-choice input:disabled+span{cursor:not-allowed}
 }
