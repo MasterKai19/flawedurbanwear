@@ -13,6 +13,9 @@ if(PHP_SAPI==='cli-server'&&preg_match('~^assets/[a-zA-Z0-9_./-]+\.(css|js|png|j
 $routes=[''=>'index.php','index.php'=>'index.php','product.php'=>'product.php','cart.php'=>'cart.php','checkout.php'=>'checkout.php','order.php'=>'order.php','info.php'=>'info.php','setup.php'=>'setup.php','image.php'=>'image.php','cron/notifications'=>'cron.php','admin'=>'admin/index.php'];
 foreach(['index','login','logout','order','products','settings','notifications','export'] as $name)$routes['admin/'.$name.'.php']='admin/'.$name.'.php';
 if(!isset($routes[$route])){http_response_code(404);header('Content-Type: text/plain');echo 'Page not found.';exit;}
+// Browsing without a cart needs no database-backed session, locks or cookie.
+// Product forms, carts, checkout and all admin routes retain full sessions/CSRF.
+if($route==='image.php'||(($_SERVER['REQUEST_METHOD']??'GET')==='GET'&&in_array($route,['','index.php','info.php'],true)&&empty($_COOKIE['flawed_session'])))define('FLAWED_NO_SESSION',true);
 if($route==='cron/notifications'){
     $secret=(string)getenv('CRON_SECRET');
     if(strlen($secret)<32||!hash_equals('Bearer '.$secret,(string)($_SERVER['HTTP_AUTHORIZATION']??''))){http_response_code(401);exit('Unauthorized');}

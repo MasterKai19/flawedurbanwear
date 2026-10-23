@@ -20,7 +20,6 @@ function cloud_db(): PDO {
 final class CloudSessions implements SessionHandlerInterface, SessionUpdateTimestampHandlerInterface {
     private ?string $lock=null;
     public function open(string $path,string $name):bool{
-        cloud_db()->exec('CREATE TABLE IF NOT EXISTS cloud_sessions (id CHAR(64) PRIMARY KEY,data MEDIUMBLOB NOT NULL,expires_at DATETIME NOT NULL,INDEX(expires_at)) ENGINE=InnoDB');
         return true;
     }
     private function acquire(string $id):void{

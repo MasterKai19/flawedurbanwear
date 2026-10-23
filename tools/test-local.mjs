@@ -31,6 +31,10 @@ try{
  for(let n=0;n<30;n++){try{await fetch(base+'assets/store.css');break}catch{await new Promise(r=>setTimeout(r,100))}}
  const owner=client(),buyer=client(),other=client();
  let r=await owner('');assert.equal(r.status,200);
+ assert.equal(query('SELECT COUNT(*) FROM cloud_sessions'),'0','Anonymous homepage must not create a database session');
+ query("UPDATE settings SET value='1' WHERE name='installation_version'");
+ r=await owner('');assert.equal(r.status,200);
+ assert.equal(query("SELECT value FROM settings WHERE name='installation_version'"),'2','Existing stores migrate safely');
  assert.equal(query('SELECT COUNT(*) FROM products'),'12');
  assert.equal(query('SELECT COUNT(*) FROM variants'),'46');
  assert.equal(query('SELECT SUM(stock) FROM variants'),'4');

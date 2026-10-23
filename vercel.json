@@ -1,5 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
+  "regions": ["bom1"],
   "functions": {"api/index.php": {"runtime": "vercel-php@0.9.0", "maxDuration": 60}},
   "routes": [
     {"src": "/assets/(.*\\.(?:css|js|png|jpg|jpeg|webp|svg|ico|woff2))", "dest": "/assets/$1"},
