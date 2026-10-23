@@ -39,6 +39,7 @@ try{
  assert.equal(query("SELECT image FROM products WHERE sku='FU-LIVING'"),'assets/products/fu-living-01.jpg');
  assert.equal(query("SELECT image FROM products WHERE sku='FU-MIRACLE'"),'assets/products/fu-miracle-05.jpg');
  assert.equal(query("SELECT COUNT(*) FROM products WHERE sku='FU-PASSION' AND back_image IS NULL"),'1');
+ assert.equal((r.html.match(/class="card-back"/g)||[]).length,12,'All catalogue products have an alternate photo');
  assert.equal(query('SELECT COUNT(*) FROM products'),'12');
  assert.equal(query('SELECT COUNT(*) FROM variants'),'46');
  assert.equal(query('SELECT SUM(stock) FROM variants'),'4');
@@ -92,19 +93,47 @@ try{
  assert.equal(race.filter(x=>x.status===302).length,1,'Last unit can be sold only once');
  assert.equal(query(`SELECT stock FROM variants WHERE product_id=${lost} AND size='L'`),'0');
  const cron=await fetch(base+'cron/notifications',{headers:{Authorization:'Bearer '+env.CRON_SECRET}});assert.equal(cron.status,200);assert.equal((await cron.json()).status,'not_configured');
+
  assert.equal(query('SELECT COUNT(*) FROM products'),'12');
  assert.equal(query('SELECT COUNT(*) FROM admins'),'1');
+
+ // Reorder, remove, archive and restore without deleting order history.
+ let editor=await owner('admin/products.php?id='+living);
+ assert.match(editor.html,/data-photo-editor/);
+ const originalPhotos=[...editor.html.matchAll(/name="gallery_order\[\]" value="([^"]+)"/g)].map(m=>m[1].replaceAll('&amp;','&'));
+ assert(originalPhotos.length>=2);
+ const save=new FormData();for(const [k,v] of Object.entries({csrf:token(editor.html),id:living,name:'LIVING | T-Shirt',slug:'living-tee',price:'500',category:'T-shirts',description:'Test gallery',active:'1',gallery_present:'1','sizes[]':'L','stock[L]':'0'}))save.set(k,v);
+ save.append('gallery_order[]',originalPhotos[1]);save.append('gallery_order[]',originalPhotos[0]);
+ assert.equal((await owner('admin/products.php?id='+living,save)).status,302);
+ assert.equal(query(`SELECT image FROM products WHERE id=${living}`),originalPhotos[1]);
+ assert.equal(JSON.parse(query(`SELECT source_images FROM products WHERE id=${living}`)).length,2,'Removed gallery photos stay removed');
+ let detail=await owner('product.php?slug=living-tee');assert.match(detail.html,/view 1/);
+ editor=await owner('admin/products.php?id='+living);
+ const beforeOrders=query('SELECT COUNT(*) FROM order_items');
+ assert.equal((await owner('admin/products.php',{csrf:token(editor.html),id:living,action:'archive'})).status,302);
+ assert.equal((await buyer('product.php?slug=living-tee')).status,404);
+ assert.equal(query('SELECT COUNT(*) FROM order_items'),beforeOrders);
+ editor=await owner('admin/products.php?id='+living);
+ assert.equal((await owner('admin/products.php',{csrf:token(editor.html),id:living,action:'restore'})).status,302);
+ assert.equal((await buyer('product.php?slug=living-tee')).status,200);
+ console.log('PASS: existing photos, reordered cover/hover, removed gallery photos, archive/restore preserving orders.');
  const deviceA=client(),deviceB=client();
  for(const device of [deviceA,deviceB]){
   let login=await device('admin/login.php');
-  assert.match(login.html,/Show password/);assert.match(login.html,/Keep me signed in/);
-  login=await device('admin/login.php',{csrf:token(login.html),email:'test-owner@example.test',password:'Only-Test-Password-42',remember:'1'});
+  assert.match(login.html,/Show password/);assert.match(login.html,/stay signed in automatically/);
+  login=await device('admin/login.php',{csrf:token(login.html),email:'test-owner@example.test',password:'Only-Test-Password-42'});
   assert.equal(login.status,302);assert(device.cookies.has('flawed_admin_remember'));
   assert(login.setCookies.some(c=>c.startsWith('flawed_admin_remember=')&&/HttpOnly/i.test(c)&&/SameSite=Lax/i.test(c)&&/expires=/i.test(c)));
   device.cookies.delete('flawed_session');
   assert.equal((await device('admin/index.php',undefined,18096)).status,200,'Remembered browser survives new session/instance');
  }
- assert.equal(query('SELECT COUNT(*) FROM admin_remember_tokens'),'2','Independent remembered devices');
+ assert.equal(query('SELECT COUNT(*) FROM admin_remember_tokens WHERE admin_id=1'),'3','Owner and two independent remembered devices');
+ query('UPDATE admin_remember_tokens SET expires_at=DATE_ADD(NOW(),INTERVAL 1 DAY)');
+ await deviceB('admin/index.php');
+ assert.equal(query('SELECT COUNT(*) FROM admin_remember_tokens WHERE expires_at>DATE_ADD(NOW(),INTERVAL 300 DAY)'),'1','Active admin visits renew remembered access');
+ deviceB.cookies.delete('flawed_admin_remember');await deviceB('admin/index.php');
+ assert(deviceB.cookies.get('flawed_admin_remember'),'Existing signed-in browser gets remembered automatically');
+ deviceB.cookies.delete('flawed_session');assert.equal((await deviceB('admin/index.php')).status,200);
  const savedA=deviceA.cookies.get('flawed_admin_remember');
  let dashboard=await deviceA('admin/index.php');
  await deviceA('admin/logout.php',{csrf:token(dashboard.html)});

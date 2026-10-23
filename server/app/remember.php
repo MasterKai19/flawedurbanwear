@@ -16,12 +16,19 @@ function admin_remember_device(int $adminId,string $passwordHash):void {
     admin_remember_cookie($selector.'.'.$validator,time()+365*86400);
 }
 function admin_restore_device():void {
-    if(!empty($_SESSION['admin_id'])||empty($_COOKIE['flawed_admin_remember']))return;
+    // Upgrade sessions created before automatic remembered login.
+    if(empty($_COOKIE['flawed_admin_remember'])){
+        if(!empty($_SESSION['admin_id'])){
+            $admin=query('SELECT id,password_hash FROM admins WHERE id=?',[$_SESSION['admin_id']])->fetch();
+            if($admin)admin_remember_device((int)$admin['id'],$admin['password_hash']);
+        }
+        return;
+    }
     $cookie=(string)$_COOKIE['flawed_admin_remember'];
     if(!preg_match('/^([a-f0-9]{32})\.([a-f0-9]{64})$/D',$cookie,$m)){admin_remember_cookie('',time()-3600);return;}
     $row=query('SELECT t.*,a.password_hash FROM admin_remember_tokens t JOIN admins a ON a.id=t.admin_id WHERE t.selector=? AND t.expires_at>NOW()',[$m[1]])->fetch();
     if(!$row||!hash_equals($row['token_hash'],hash('sha256',$m[2]))||!hash_equals($row['password_stamp'],hash('sha256',$row['password_hash']))){admin_remember_cookie('',time()-3600);return;}
-    session_regenerate_id(true);$_SESSION['admin_id']=$row['admin_id'];$_SESSION['csrf']=bin2hex(random_bytes(32));
+    if(empty($_SESSION['admin_id'])){session_regenerate_id(true);$_SESSION['admin_id']=$row['admin_id'];$_SESSION['csrf']=bin2hex(random_bytes(32));}
     query('UPDATE admin_remember_tokens SET expires_at=DATE_ADD(NOW(),INTERVAL 365 DAY) WHERE selector=?',[$m[1]]);
     admin_remember_cookie($cookie,time()+365*86400);
 }

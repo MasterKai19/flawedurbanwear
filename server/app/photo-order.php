@@ -20,3 +20,13 @@ function arrange_catalog_photos():void {
     // These sets have no distinct front/back pair. Keep their gallery photos.
     query("UPDATE products SET back_image=NULL WHERE sku IN ('FU-PASSION','FU-LOST','FU-CARGO-BLUE','FU-CARGO-BROWN') AND image LIKE 'assets/products/%' AND back_image LIKE 'assets/products/%'");
 }
+
+function product_gallery(array $product):array {
+    $photos=array_filter([$product['image']??null,$product['back_image']??null]);
+    foreach(json_decode($product['source_images']??'[]',true)??[] as $source){
+        if(preg_match('/^image\.php\?id=[a-f0-9]{64}$/D',$source))$photos[]=$source;
+        else {$path='assets/products/'.basename($source);if(is_file(dirname(__DIR__,2).'/'.$path))$photos[]=$path;}
+    }
+    return array_values(array_unique($photos));
+}
+function product_hover_photo(array $product):?string {return product_gallery($product)[1]??null;}

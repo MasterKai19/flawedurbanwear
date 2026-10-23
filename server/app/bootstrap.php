@@ -11,7 +11,7 @@ session_name('flawed_session');
 session_set_cookie_params(['httponly'=>true,'secure'=>$https,'samesite'=>'Lax','path'=>rtrim($config['base_path'],'/').'/']);
 if(!defined('FLAWED_NO_SESSION')){session_set_save_handler(new CloudSessions(),true);session_start();}
 require_once __DIR__.'/remember.php';
-if(session_status()===PHP_SESSION_ACTIVE)admin_restore_device();
+if(session_status()===PHP_SESSION_ACTIVE && (($route??'')==='admin'||str_starts_with($route??'','admin/')))admin_restore_device();
 header('X-Content-Type-Options: nosniff'); header('X-Frame-Options: DENY'); header('Referrer-Policy: same-origin');
 header("Content-Security-Policy: default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'self'");
 header('Cache-Control: no-store');

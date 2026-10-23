@@ -11,3 +11,25 @@ document.querySelectorAll('.product-card .card-back').forEach(back=>{
  card.addEventListener('pointerenter',event=>{if(photoHover.matches&&event.pointerType!=='touch')loadBack();});
  card.addEventListener('focus',()=>{if(card.matches(':focus-visible'))loadBack();});
 });
+
+const photoEditor=document.querySelector('[data-photo-editor]');
+if(photoEditor){
+ const refreshPhotos=()=>Array.from(photoEditor.children).forEach((tile,i,all)=>{
+  tile.querySelector('[data-photo-role]').textContent=i===0?'Cover':i===1?'Hover':'Gallery';
+  tile.querySelector('[data-photo-move="-1"]').disabled=i===0;
+  tile.querySelector('[data-photo-move="1"]').disabled=i===all.length-1;
+ });
+ photoEditor.addEventListener('click',e=>{
+  const button=e.target.closest('button');if(!button)return;const tile=button.closest('.photo-tile');
+  if(button.hasAttribute('data-photo-remove'))tile.remove();
+  else if(button.dataset.photoMove==='-1'&&tile.previousElementSibling)photoEditor.insertBefore(tile,tile.previousElementSibling);
+  else if(button.dataset.photoMove==='1'&&tile.nextElementSibling)photoEditor.insertBefore(tile.nextElementSibling,tile);
+  refreshPhotos();
+ });refreshPhotos();
+}
+const productSearch=document.querySelector('[data-product-search]');
+const productFilter=document.querySelector('[data-product-filter]');
+const filterProducts=()=>document.querySelectorAll('[data-product-list] .bag-row').forEach(row=>{
+ row.hidden=!row.textContent.toLowerCase().includes(productSearch.value.toLowerCase())||(productFilter.value!=='all'&&row.dataset.status!==productFilter.value);
+});
+productSearch?.addEventListener('input',filterProducts);productFilter?.addEventListener('change',filterProducts);
