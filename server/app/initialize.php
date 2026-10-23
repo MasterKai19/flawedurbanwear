@@ -1,15 +1,16 @@
 <?php
 declare(strict_types=1);
 require_once __DIR__.'/catalog.php';
+require_once __DIR__.'/photo-order.php';
 function initialize_store():void {
     try {
-        if(query("SELECT value FROM settings WHERE name='installation_version'")->fetchColumn()==='3')return;
+        if(query("SELECT value FROM settings WHERE name='installation_version'")->fetchColumn()==='4')return;
     } catch(PDOException $e) { if($e->getCode()!=='42S02')throw $e; }
     $lock='flawed_install_'.substr(hash('sha256',(string)$GLOBALS['config']['db_name']),0,32);
     if((int)query('SELECT GET_LOCK(?,15)',[$lock])->fetchColumn()!==1)throw new RuntimeException('Initialization busy. Retry shortly.');
     try {
         install_schema('schema.sql');install_schema('cloud.sql');install_schema('notifications.sql');
-        if(query("SELECT value FROM settings WHERE name='installation_version'")->fetchColumn()==='3')return;
+        if(query("SELECT value FROM settings WHERE name='installation_version'")->fetchColumn()==='4')return;
         $hasOwner=(int)query('SELECT COUNT(*) FROM admins')->fetchColumn()>0;
         $email=trim((string)getenv('OWNER_EMAIL'));
         $password=(string)getenv('OWNER_PASSWORD');
@@ -19,7 +20,8 @@ function initialize_store():void {
         db()->beginTransaction();
         if(!$hasOwner)query('INSERT INTO admins(email,password_hash) VALUES(?,?)',[$email,password_hash($password,PASSWORD_DEFAULT)]);
         seed_catalog();
-        query("INSERT INTO settings(name,value) VALUES('installation_version','3') ON DUPLICATE KEY UPDATE value='3'");
+        arrange_catalog_photos();
+        query("INSERT INTO settings(name,value) VALUES('installation_version','4') ON DUPLICATE KEY UPDATE value='4'");
         db()->commit();
     } catch(Throwable $e) {
         if(db()->inTransaction())db()->rollBack();

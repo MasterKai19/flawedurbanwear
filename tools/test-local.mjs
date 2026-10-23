@@ -29,13 +29,16 @@ function client(){
 }
 const token=h=>{const m=h.match(/name="csrf" value="([^"]+)"/);assert(m,'Missing CSRF');return m[1]};
 try{
- for(let n=0;n<30;n++){try{await fetch(base+'assets/store.css');break}catch{await new Promise(r=>setTimeout(r,100))}}
+ for(let n=0;n<30;n++){try{await (await fetch(base+'assets/store.css')).arrayBuffer();break}catch{await new Promise(r=>setTimeout(r,100))}}
  const owner=client(),buyer=client(),other=client();
  let r=await owner('');assert.equal(r.status,200);
  assert.equal(query('SELECT COUNT(*) FROM cloud_sessions'),'0','Anonymous homepage must not create a database session');
  query("UPDATE settings SET value='1' WHERE name='installation_version'");
  r=await owner('');assert.equal(r.status,200);
- assert.equal(query("SELECT value FROM settings WHERE name='installation_version'"),'3','Existing stores migrate safely');
+ assert.equal(query("SELECT value FROM settings WHERE name='installation_version'"),'4','Existing stores migrate safely');
+ assert.equal(query("SELECT image FROM products WHERE sku='FU-LIVING'"),'assets/products/fu-living-01.jpg');
+ assert.equal(query("SELECT image FROM products WHERE sku='FU-MIRACLE'"),'assets/products/fu-miracle-05.jpg');
+ assert.equal(query("SELECT COUNT(*) FROM products WHERE sku='FU-PASSION' AND back_image IS NULL"),'1');
  assert.equal(query('SELECT COUNT(*) FROM products'),'12');
  assert.equal(query('SELECT COUNT(*) FROM variants'),'46');
  assert.equal(query('SELECT SUM(stock) FROM variants'),'4');

@@ -72,3 +72,18 @@ input:focus,textarea:focus,select:focus,button:focus-visible,a:focus-visible,sum
 .card-image .sold-out-ribbon{background:#b9222d;color:#fff;border-color:#ff6570;box-shadow:0 4px 14px #0008}
 .password-field{display:flex;align-items:stretch;border:1px solid #45454c;background:#111114}.password-field input{border:0;margin:0;min-width:0}.password-toggle{flex-shrink:0;padding:12px;background:transparent;color:#ff8690;border:0;font-size:12px}.password-field:focus-within{outline:2px solid var(--accent)}
 @media(prefers-reduced-motion:reduce){.product-card .card-image{transition:none}.product-card:hover .card-image,.product-card:focus-visible .card-image{transform:none}}
+/* Front-to-back previews: load the second photo only when requested. */
+.card-image.has-back .card-back{position:absolute;inset:0;width:100%;height:100%;opacity:0;pointer-events:none;transition:opacity .28s ease}
+.card-image.has-back .card-front{transition:opacity .28s ease,transform .35s ease}
+@media(hover:hover) and (pointer:fine){
+ .product-card:hover .card-image.back-ready .card-back{opacity:1}
+ .product-card:hover .card-image.back-ready .card-front{opacity:0}
+ body{cursor:url('cursor-cyber.svg') 3 2,auto}
+ a,button,summary,.size-choice span,input[type=checkbox],input[type=radio],select{cursor:url('cursor-target.svg') 16 16,pointer}
+ input:not([type=checkbox]):not([type=radio]),textarea{cursor:text}
+ button:disabled,.size-choice input:disabled+span{cursor:not-allowed}
+}
+.product-card:focus-visible .card-image.back-ready .card-back{opacity:1}
+.product-card:focus-visible .card-image.back-ready .card-front{opacity:0}
+@media(prefers-reduced-motion:reduce){.card-image.has-back .card-back,.card-image.has-back .card-front{transition:none}}
+@media(forced-colors:active){body,a,button,summary,select{cursor:auto}}

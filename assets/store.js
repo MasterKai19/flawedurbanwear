@@ -3,3 +3,11 @@ const area=document.getElementById('delivery-area');if(area){const update=()=>{c
 document.querySelectorAll('form[enctype="multipart/form-data"]').forEach(form=>form.addEventListener('submit',event=>{const bytes=[...form.querySelectorAll('input[type="file"]')].flatMap(input=>[...input.files]).reduce((sum,file)=>sum+file.size,0);if(bytes>3*1024*1024){event.preventDefault();alert('Please keep the combined photo upload under 3 MB.');}}));
 const passwordToggle=document.querySelector('.password-toggle');
 if(passwordToggle)passwordToggle.addEventListener('click',()=>{const input=document.getElementById(passwordToggle.getAttribute('aria-controls'));const show=input.type==='password';input.type=show?'text':'password';passwordToggle.textContent=show?'Hide password':'Show password';passwordToggle.setAttribute('aria-pressed',String(show));});
+// Native SVG cursors need no mousemove handlers or animation loops.
+const photoHover=matchMedia('(hover:hover) and (pointer:fine)');
+document.querySelectorAll('.product-card .card-back').forEach(back=>{
+ const card=back.closest('.product-card');
+ const loadBack=()=>{if(back.dataset.loading)return;back.dataset.loading='1';back.addEventListener('load',()=>back.parentElement.classList.add('back-ready'),{once:true});back.addEventListener('error',()=>{back.parentElement.classList.remove('back-ready');back.removeAttribute('src');delete back.dataset.loading;},{once:true});back.src=back.dataset.backSrc;};
+ card.addEventListener('pointerenter',event=>{if(photoHover.matches&&event.pointerType!=='touch')loadBack();});
+ card.addEventListener('focus',()=>{if(card.matches(':focus-visible'))loadBack();});
+});
