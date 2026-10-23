@@ -16,15 +16,16 @@ let logs='';for(const s of servers)s.stderr.on('data',b=>logs+=b);
 const base='http://127.0.0.1:18095/';
 function client(){
  const cookies=new Map();
- return async(path='',data,port=18095)=>{
+ const request=async(path='',data,port=18095)=>{
   const headers={cookie:[...cookies].map(([k,v])=>`${k}=${v}`).join('; ')};
   const form=data instanceof FormData;
   if(data&&!form)headers['Content-Type']='application/x-www-form-urlencoded';
   const r=await fetch(`http://127.0.0.1:${port}/`+path,{redirect:'manual',headers,...(data?{method:'POST',body:form?data:new URLSearchParams(data)}:{})});
   for(const c of r.headers.getSetCookie()){const pair=c.split(';')[0],i=pair.indexOf('=');cookies.set(pair.slice(0,i),pair.slice(i+1));}
   const html=await r.text();assert(!/Fatal error|Warning:|temporarily unavailable/i.test(html),html.slice(0,200));
-  return {html,status:r.status,location:r.headers.get('location')};
+  return {html,status:r.status,location:r.headers.get('location'),setCookies:r.headers.getSetCookie()};
  };
+ request.cookies=cookies;return request;
 }
 const token=h=>{const m=h.match(/name="csrf" value="([^"]+)"/);assert(m,'Missing CSRF');return m[1]};
 try{
@@ -34,7 +35,7 @@ try{
  assert.equal(query('SELECT COUNT(*) FROM cloud_sessions'),'0','Anonymous homepage must not create a database session');
  query("UPDATE settings SET value='1' WHERE name='installation_version'");
  r=await owner('');assert.equal(r.status,200);
- assert.equal(query("SELECT value FROM settings WHERE name='installation_version'"),'2','Existing stores migrate safely');
+ assert.equal(query("SELECT value FROM settings WHERE name='installation_version'"),'3','Existing stores migrate safely');
  assert.equal(query('SELECT COUNT(*) FROM products'),'12');
  assert.equal(query('SELECT COUNT(*) FROM variants'),'46');
  assert.equal(query('SELECT SUM(stock) FROM variants'),'4');
@@ -90,6 +91,29 @@ try{
  const cron=await fetch(base+'cron/notifications',{headers:{Authorization:'Bearer '+env.CRON_SECRET}});assert.equal(cron.status,200);assert.equal((await cron.json()).status,'not_configured');
  assert.equal(query('SELECT COUNT(*) FROM products'),'12');
  assert.equal(query('SELECT COUNT(*) FROM admins'),'1');
+ const deviceA=client(),deviceB=client();
+ for(const device of [deviceA,deviceB]){
+  let login=await device('admin/login.php');
+  assert.match(login.html,/Show password/);assert.match(login.html,/Keep me signed in/);
+  login=await device('admin/login.php',{csrf:token(login.html),email:'test-owner@example.test',password:'Only-Test-Password-42',remember:'1'});
+  assert.equal(login.status,302);assert(device.cookies.has('flawed_admin_remember'));
+  assert(login.setCookies.some(c=>c.startsWith('flawed_admin_remember=')&&/HttpOnly/i.test(c)&&/SameSite=Lax/i.test(c)&&/expires=/i.test(c)));
+  device.cookies.delete('flawed_session');
+  assert.equal((await device('admin/index.php',undefined,18096)).status,200,'Remembered browser survives new session/instance');
+ }
+ assert.equal(query('SELECT COUNT(*) FROM admin_remember_tokens'),'2','Independent remembered devices');
+ const savedA=deviceA.cookies.get('flawed_admin_remember');
+ let dashboard=await deviceA('admin/index.php');
+ await deviceA('admin/logout.php',{csrf:token(dashboard.html)});
+ deviceA.cookies.set('flawed_admin_remember',savedA);deviceA.cookies.delete('flawed_session');
+ assert.equal((await deviceA('admin/index.php')).status,302,'Logged-out token cannot restore access');
+ deviceB.cookies.delete('flawed_session');assert.equal((await deviceB('admin/index.php')).status,200,'Other device remains signed in');
+ const validB=deviceB.cookies.get('flawed_admin_remember');
+ deviceB.cookies.set('flawed_admin_remember',validB.slice(0,33)+'0'.repeat(64));deviceB.cookies.delete('flawed_session');
+ assert.equal((await deviceB('admin/index.php')).status,302,'Forged token rejected');
+ deviceB.cookies.set('flawed_admin_remember',validB);query('UPDATE admin_remember_tokens SET expires_at=DATE_SUB(NOW(),INTERVAL 1 DAY)');deviceB.cookies.delete('flawed_session');
+ assert.equal((await deviceB('admin/index.php')).status,302,'Expired token rejected');
+ console.log('PASS: remembered login across browser sessions/instances, multiple devices, cookie flags, logout revocation, forged/expired tokens.');
  console.log('PASS: setup, 12 products, 46 sizes, categories, protected source routes, cross-instance login/cart sessions, CSRF, sold-out rejection, server pricing, idempotent checkout, stock reservation/cancellation, SQL photo upload, concurrent last-unit checkout, cron authentication.');
  console.log('Isolated test database: '+database+'. No real emails or orders were sent.');
 }catch(e){console.error(logs.slice(-3000));throw e}

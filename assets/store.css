@@ -38,3 +38,37 @@ body.storefront-theme{background:#1d1d22;color:#fafafa}
 /* Inventory ribbon crosses the photo without blocking the product link. */
 .card-image .sold-out-ribbon{position:absolute;z-index:2;left:-15%;top:50%;width:130%;transform:translateY(-50%) rotate(-15deg);display:block;padding:14px 0;background:#eee9df;color:#1d1d22;text-align:center;font:900 19px/1.2 Arial,Helvetica,sans-serif;letter-spacing:5px;border-top:1px solid #1d1d2233;border-bottom:1px solid #1d1d2233;box-shadow:0 3px 12px #0003;pointer-events:none}
 @media(max-width:500px){.card-image .sold-out-ribbon{padding:10px 0;font-size:12px;letter-spacing:3px}}
+/* Black / red identity across the store and management pages. */
+:root{--ink:#09090b;--panel:#141417;--line:#343439;--accent:#ef3340;--muted:#b5b5bd;color-scheme:dark}
+body,body.storefront-theme{background:var(--ink);color:#f5f5f6}
+header,.storefront-theme header{background:#0c0c0f;color:#fff;border-bottom:1px solid #ef334055}
+.brand img{filter:none}.footer-brand img{filter:none}
+body .shop-categories,.storefront-theme .shop-categories{background:var(--ink);scrollbar-color:var(--accent) var(--ink)}
+.storefront-theme .shop-categories a[aria-current="page"]{border-bottom-color:var(--accent);color:#fff}
+body .shop-categories a:hover,nav a:hover,.back-link:hover{color:#ff6872}
+.bag-button span,.storefront-theme .bag-button span{background:#321216;border-color:var(--accent)}
+.eyebrow,.star{color:#ff6872}.hero .eyebrow,.hero-top,.hero-foot{color:#fff}
+.button.dark,.button.light{background:#ce2531;color:#fff;border-color:#ef3340}.button:hover{background:#ee3341;color:#fff}
+.button.outline{background:transparent;color:#fff;border-color:#773039}.button.outline:hover{background:#291013;border-color:var(--accent)}
+.ticker{background:#180b0e;border-top:1px solid #7c2029;border-bottom:1px solid #7c2029}
+.story,.storefront-theme .story{background:#101013;color:#fff;border-top:1px solid #ef334044}
+.story p:not(.eyebrow),.storefront-theme .story p:not(.eyebrow){color:var(--muted)}
+.story a,.storefront-theme .story a{border-color:var(--accent)}
+footer,.storefront-theme footer{background:#060608;border-top:1px solid #ef334044}
+.summary-box,.stats>div,.notice,.badge{background:var(--panel);color:#eee;border:1px solid var(--line)}
+input,textarea,select{background:#111114;color:#fff;border-color:#45454c}label{color:#d5d5da}
+input:focus,textarea:focus,select:focus,button:focus-visible,a:focus-visible,summary:focus-visible,.storefront-theme a:focus-visible{outline-color:var(--accent)}
+.check-label input{accent-color:var(--accent)}
+.description,.hint,.order-note,.narrow>p,details p,.stats span,.section-head>p,.empty{color:var(--muted)}
+.text-button{color:#f5f5f6}.error{color:#ff8c95}.stock-status{color:#dedee3!important}
+.summary-line,td,th,details,.views,.bag-row{border-color:var(--line)}th,td small,.price span{color:var(--muted)}
+.size-choice span{border-color:#505058}.size-choice input:checked+span{background:#a51d27;border-color:#ff5964;box-shadow:0 0 14px #ef334033}
+.size-choice input:disabled+span{color:#71717a}.size-choice input:focus-visible+span{outline-color:var(--accent)}
+.views button.active,.gallery-views button.active{outline-color:var(--accent);border-bottom-color:var(--accent);color:#fff}
+.product-image{border:1px solid #ef334055;border-radius:8px}.image-label{color:#fff;background:#111c;padding:7px}
+.product-card .card-image{border:1px solid #343439;border-radius:10px;transition:border-color .25s ease,box-shadow .25s ease,transform .25s ease}
+.product-card:hover .card-image,.product-card:focus-visible .card-image,.product-card:active .card-image{border-color:#ff3b49;box-shadow:0 0 0 1px #ef334080,0 0 24px #ef334050;transform:translateY(-3px)}
+.product-card:focus-visible{outline:0}.product-card:focus-visible .card-image{outline:2px solid #ff6670;outline-offset:3px}
+.card-image .sold-out-ribbon{background:#b9222d;color:#fff;border-color:#ff6570;box-shadow:0 4px 14px #0008}
+.password-field{display:flex;align-items:stretch;border:1px solid #45454c;background:#111114}.password-field input{border:0;margin:0;min-width:0}.password-toggle{flex-shrink:0;padding:12px;background:transparent;color:#ff8690;border:0;font-size:12px}.password-field:focus-within{outline:2px solid var(--accent)}
+@media(prefers-reduced-motion:reduce){.product-card .card-image{transition:none}.product-card:hover .card-image,.product-card:focus-visible .card-image{transform:none}}

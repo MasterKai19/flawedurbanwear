@@ -1,1 +1,1 @@
-<?php require dirname(__DIR__).'/app/bootstrap.php';if($_SERVER['REQUEST_METHOD']!=='POST'){http_response_code(405);exit;}check_csrf();unset($_SESSION['admin_id']);session_regenerate_id(true);redirect('admin/login.php');
+<?php require dirname(__DIR__).'/app/bootstrap.php';if($_SERVER['REQUEST_METHOD']!=='POST'){http_response_code(405);exit;}check_csrf();admin_forget_device();unset($_SESSION['admin_id']);session_regenerate_id(true);redirect('admin/login.php');

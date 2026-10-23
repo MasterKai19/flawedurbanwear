@@ -10,6 +10,8 @@ ini_set('session.use_strict_mode','1');
 session_name('flawed_session');
 session_set_cookie_params(['httponly'=>true,'secure'=>$https,'samesite'=>'Lax','path'=>rtrim($config['base_path'],'/').'/']);
 if(!defined('FLAWED_NO_SESSION')){session_set_save_handler(new CloudSessions(),true);session_start();}
+require_once __DIR__.'/remember.php';
+if(session_status()===PHP_SESSION_ACTIVE)admin_restore_device();
 header('X-Content-Type-Options: nosniff'); header('X-Frame-Options: DENY'); header('Referrer-Policy: same-origin');
 header("Content-Security-Policy: default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'self'");
 header('Cache-Control: no-store');
@@ -45,5 +47,5 @@ function render_header(string $title='Flawed Urbanwear',bool $admin=false): void
     echo '</header>';
     if(isset($_SESSION['flash'])){echo '<div class="notice" role="status">'.h($_SESSION['flash']).'</div>';unset($_SESSION['flash']);}
 }
-function render_footer(): void { echo '<footer><a class="footer-brand" href="'.url().'"><img src="'.url('assets/logo.png').'" alt="Flawed logo"><span>Flawed<br><em>Urbanwear.</em></span></a><div><span>STREET CULTURE / EST. 2023</span><a href="https://www.instagram.com/flawedurbanwear/" target="_blank" rel="noopener">@flawedurbanwear ↗</a><a href="'.url('info.php').'">DELIVERY & HELP</a><a href="'.url('admin/index.php').'">ADMIN</a></div><p>© '.date('Y').' Flawed Urbanwear · Online only.</p></footer><script src="'.url('assets/store.js').'"></script></body></html>'; }
+function render_footer(): void { echo '<footer><a class="footer-brand" href="'.url().'"><img src="'.url('assets/logo.png').'" alt="Flawed logo"><span>Flawed<br><em>Urbanwear.</em></span></a><div><span>STREET CULTURE / EST. 2023</span><a href="https://www.instagram.com/flawedurbanwear/" target="_blank" rel="noopener">@flawedurbanwear ↗</a><a href="'.url('info.php').'">DELIVERY & HELP</a><a href="'.url('admin/index.php').'">ADMIN</a></div><p>© '.date('Y').' Flawed Urbanwear · Online only.</p></footer><script src="'.url('assets/store.js?v='.filemtime(dirname(__DIR__,2).'/assets/store.js')).'"></script></body></html>'; }
 set_exception_handler(function(Throwable $e){error_log('Flawed application error: '.$e->getMessage());http_response_code(500);echo '<!doctype html><title>Flawed — setup needed</title><h1>Flawed Urbanwear</h1><p>The store is temporarily unavailable. If you are the owner, check the cloud database and owner environment variables in Vercel.</p>';});
