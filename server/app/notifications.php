@@ -6,7 +6,35 @@ function notifications_installed(): bool {
     catch(PDOException $e){if($e->getCode()==='42S02')return false;throw $e;}
 }
 function notifications_ready(): bool {
+    if(telegram_ready())return true;
     return setting('google_enabled')==='1' && valid_google_url((string)setting('google_webhook_url')) && strlen((string)setting('google_secret'))>=32;
+}
+function telegram_ready(): bool {
+    return (bool)preg_match('/^\d+:[A-Za-z0-9_-]{20,}$/D',(string)getenv('TELEGRAM_BOT_TOKEN'))
+        && (bool)preg_match('/^-?\d+$/D',(string)getenv('TELEGRAM_CHAT_ID'));
+}
+function telegram_order_text(array $payload): string {
+    $o=$payload['order'];
+    $lines=['Flawed Urbanwear — new order', 'Reference: '.$payload['event_id']];
+    foreach($o['items'] as $item)$lines[]=$item['product_name'].' / '.$item['size'].' × '.$item['quantity'];
+    $lines[]='Subtotal: BDT '.$o['subtotal'];
+    $lines[]='Delivery: '.($o['delivery_fee']===null?'To be confirmed':'BDT '.$o['delivery_fee']);
+    $lines[]='Total: '.($o['total']===null?'Pending delivery fee':'BDT '.$o['total']);
+    $lines[]='Payment: '.$o['payment_method'].' / '.$o['payment_status'];
+    // Keep customer contact details and private order access tokens in the admin dashboard.
+    $lines[]='View order: https://flawedurbanwear.vercel.app/admin/index.php';
+    $text=implode("\n",$lines);
+    return mb_strlen($text,'UTF-8')>4000?mb_substr($text,0,3800,'UTF-8')."\nMore items in the admin dashboard.":$text;
+}
+function telegram_request(string $text): void {
+    if(!telegram_ready())throw new RuntimeException('Set TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID in Vercel and redeploy.');
+    if(!function_exists('curl_init'))throw new RuntimeException('PHP cURL is required.');
+    $ch=curl_init('https://api.telegram.org/bot'.getenv('TELEGRAM_BOT_TOKEN').'/sendMessage');
+    curl_setopt_array($ch,[CURLOPT_RETURNTRANSFER=>true,CURLOPT_FOLLOWLOCATION=>false,CURLOPT_CONNECTTIMEOUT=>5,CURLOPT_TIMEOUT=>12,CURLOPT_SSL_VERIFYPEER=>true,CURLOPT_SSL_VERIFYHOST=>2,CURLOPT_PROTOCOLS=>CURLPROTO_HTTPS,CURLOPT_POST=>true,CURLOPT_HTTPHEADER=>['Content-Type: application/json'],CURLOPT_POSTFIELDS=>json_encode(['chat_id'=>(string)getenv('TELEGRAM_CHAT_ID'),'text'=>$text,'link_preview_options'=>['is_disabled'=>true]],JSON_THROW_ON_ERROR)]);
+    $body=curl_exec($ch);$status=(int)curl_getinfo($ch,CURLINFO_RESPONSE_CODE);curl_close($ch);
+    // Never expose the bot-token URL or raw transport errors in the dashboard/logs.
+    $result=is_string($body)?json_decode($body,true):null;
+    if($status!==200||($result['ok']??false)!==true)throw new RuntimeException('Telegram delivery failed. Check the bot token, chat ID and that you pressed Start in your bot. Retry later.');
 }
 function valid_google_url(string $url): bool {
     return (bool)preg_match('~^https://script\.google\.com/macros/s/[A-Za-z0-9_-]+/exec$~D',$url);
@@ -47,6 +75,13 @@ function notification_send(int $orderId, ?callable $transport=null): bool {
     $claim=query("UPDATE order_notifications SET status='sending',lease_until=DATE_ADD(NOW(),INTERVAL 3 MINUTE),attempts=attempts+1 WHERE order_id=? AND status<>'sent' AND (lease_until IS NULL OR lease_until<NOW()) AND (next_attempt_at IS NULL OR next_attempt_at<=NOW()) AND attempts<10",[$orderId]);
     if(!$claim->rowCount())return false;
     try{
+        if(telegram_ready()){
+            $payload=notification_payload($orderId);
+            if($transport){$result=$transport($payload);if(($result['ok']??false)!==true)throw new RuntimeException('Telegram delivery failed.');}
+            else telegram_request(telegram_order_text($payload));
+            query("UPDATE order_notifications SET status='sent',sent_at=NOW(),lease_until=NULL,next_attempt_at=NULL,last_error=NULL WHERE order_id=?",[$orderId]);
+            return true;
+        }
         $payload=notification_payload($orderId);$result=$transport?$transport($payload):google_request($payload);
         if(($result['event_id']??null)!==$payload['event_id'])throw new RuntimeException('Google did not acknowledge this order.');
         $sheet=($result['sheet_logged']??false)===true;$owner=($result['owner_emailed']??false)===true;
