@@ -104,3 +104,6 @@ body.bag-is-open{overflow:hidden}#bag-drawer{color:#f4f4f5;background:#101012;bo
 @media(prefers-reduced-motion:reduce){#bag-drawer[open]{animation:none}}
 
 #bag-drawer{overscroll-behavior:contain;padding-bottom:calc(26px + env(safe-area-inset-bottom));max-height:100dvh}
+
+/* Fixed vector arrows avoid font-dependent glyphs on iOS. */
+.hero-arrow{display:block;width:20px;height:20px;flex:0 0 20px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}.hero-foot a{display:inline-flex;align-items:center;gap:8px}.hero-arrow-down{width:16px;height:16px;flex-basis:16px}
