@@ -1,6 +1,41 @@
 document.querySelectorAll('[data-image]').forEach(button=>button.addEventListener('click',()=>{const img=document.getElementById('main-image');img.src=button.dataset.image;img.alt=button.dataset.alt;document.querySelectorAll('[data-image]').forEach(b=>{b.classList.toggle('active',b===button);b.setAttribute('aria-pressed',b===button?'true':'false')})}));
 const area=document.getElementById('delivery-area');if(area){const update=()=>{const fee=area.selectedOptions[0].dataset.fee;const subtotal=Number(document.getElementById('checkout-subtotal').dataset.subtotal);const known=fee!==undefined&&fee!=='';document.getElementById('delivery-amount').textContent=known?'৳'+Number(fee).toLocaleString():area.value?'To be confirmed':'Select area';document.getElementById('checkout-total').textContent=known?'৳'+(subtotal+Number(fee)).toLocaleString():'Pending delivery';};area.addEventListener('change',update);update();document.getElementById('checkout-form').addEventListener('submit',()=>{const button=document.getElementById('place-order');button.disabled=true;button.textContent='SAVING YOUR ORDER…';});}
-document.querySelectorAll('form[enctype="multipart/form-data"]').forEach(form=>form.addEventListener('submit',event=>{const bytes=[...form.querySelectorAll('input[type="file"]')].flatMap(input=>[...input.files]).reduce((sum,file)=>sum+file.size,0);if(bytes>3*1024*1024){event.preventDefault();alert('Please keep the combined photo upload under 3 MB.');}}));
+// Compress admin uploads before sending them, including on hosts without GD.
+document.querySelectorAll('form[enctype="multipart/form-data"]').forEach(form=>{
+ let ready=false,busy=false;
+ const message=document.createElement('p');message.className='hint';message.setAttribute('role','status');form.append(message);
+ form.addEventListener('submit',async event=>{
+  if(ready)return;event.preventDefault();if(busy)return;busy=true;
+  const button=event.submitter;const inputs=[...form.querySelectorAll('input[type="file"]')];
+  if(button)button.disabled=true;message.textContent='Preparing photos…';
+  try{
+   const prepared=[];
+   for(const input of inputs){
+    const files=[];
+    for(const file of input.files){
+     if(!['image/jpeg','image/png','image/webp'].includes(file.type))throw new Error('Choose a JPEG, PNG or WebP image.');
+     if(file.size>20*1024*1024)throw new Error('Each original photo must be under 20 MB.');
+     const bitmap=await createImageBitmap(file);let output=file;
+     try{
+      const scale=Math.min(1,1600/Math.max(bitmap.width,bitmap.height));
+      const canvas=document.createElement('canvas');canvas.width=Math.max(1,Math.round(bitmap.width*scale));canvas.height=Math.max(1,Math.round(bitmap.height*scale));
+      canvas.getContext('2d').drawImage(bitmap,0,0,canvas.width,canvas.height);
+      const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/webp',.8));
+      if(blob&&blob.size<file.size){const extension=blob.type==='image/webp'?'webp':'png';output=new File([blob],file.name.replace(/\.[^.]+$/,'')+'.'+extension,{type:blob.type});}
+      canvas.width=canvas.height=1;
+     }finally{bitmap.close();}
+     files.push(output);
+    }
+    prepared.push([input,files]);
+   }
+   const total=prepared.flatMap(([,files])=>files).reduce((n,f)=>n+f.size,0);
+   if(total>3*1024*1024)throw new Error('Photos are still over 3 MB combined after compression. Save fewer photos at a time.');
+   for(const [input,files] of prepared){const transfer=new DataTransfer();files.forEach(f=>transfer.items.add(f));input.files=transfer.files;}
+   ready=true;message.textContent='Photos prepared. Saving product…';if(button)button.disabled=false;form.requestSubmit(button||undefined);
+  }catch(error){message.textContent=error.message||'Could not prepare photos. Please try smaller JPEG or WebP files.';}
+  finally{busy=false;if(button)button.disabled=false;}
+ });
+});
 const passwordToggle=document.querySelector('.password-toggle');
 if(passwordToggle)passwordToggle.addEventListener('click',()=>{const input=document.getElementById(passwordToggle.getAttribute('aria-controls'));const show=input.type==='password';input.type=show?'text':'password';passwordToggle.textContent=show?'Hide password':'Show password';passwordToggle.setAttribute('aria-pressed',String(show));});
 // Native SVG cursors need no mousemove handlers or animation loops.

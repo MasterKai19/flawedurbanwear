@@ -5,7 +5,7 @@ import {resolve} from 'node:path';
 const root=resolve(import.meta.dirname,'..');
 const php='D:/SOFTWARE/xamp/php/php.exe',mysql='D:/SOFTWARE/xamp/mysql/bin/mysql.exe';
 const database='flawed_vercel_test_'+Date.now();
-const sql=q=>execFileSync(mysql,['--host=127.0.0.1','--port=13317','--user=root','--batch','--skip-column-names','-e',q],{encoding:'utf8'}).trim();
+const sql=q=>execFileSync(mysql,['--default-character-set=utf8mb4','--host=127.0.0.1','--port=13317','--user=root','--batch','--skip-column-names','-e',q],{encoding:'utf8'}).trim();
 sql(`CREATE DATABASE ${database} CHARACTER SET utf8mb4`);
 const query=q=>sql(`USE ${database};${q}`);
 const setupKey='local-test-setup-key-only-1234567890123456789';
@@ -56,7 +56,8 @@ try{
  r=await owner('admin/login.php');r=await owner('admin/login.php',{csrf:token(r.html),email:'test-owner@example.test',password:'Only-Test-Password-42'});
  assert.equal(r.status,302);
  r=await owner('admin/index.php',undefined,18096);assert.equal(r.status,200,'Session must survive a different function instance');
- r=await owner('admin/settings.php');r=await owner('admin/settings.php',{csrf:token(r.html),dhaka:'60',outside:'120'});assert.equal(r.status,302);
+ r=await owner('admin/settings.php');r=await owner('admin/settings.php',{csrf:token(r.html),dhaka:'60',outside:'120',estimate_dhaka:'2–3 working days',estimate_outside:'4–5 working days'});assert.equal(r.status,302);
+ assert.equal(query("SELECT value FROM settings WHERE name='delivery_estimate_dhaka'"),'2–3 working days');
  const passion=query("SELECT id FROM products WHERE sku='FU-PASSION'"),living=query("SELECT id FROM products WHERE sku='FU-LIVING'");
  r=await buyer('product.php?slug=living-tee');assert.match(r.html,/SOLD OUT/);assert(!r.html.includes('BUY NOW'));
  r=await buyer('cart.php',{csrf:token(r.html),action:'add',product_id:living,size:'L',quantity:'1'});assert.equal(r.status,302);
@@ -72,6 +73,18 @@ try{
  assert.equal(query('SELECT total FROM orders'),'1110');
  assert.equal(query('SELECT COUNT(*) FROM order_notifications'),'1');
  r=await buyer('checkout.php',data);assert.equal(r.status,302);assert.equal(query('SELECT COUNT(*) FROM orders'),'1','Duplicate checkout must not create another order');
+ // Public tracking requires both details and does not reveal private fields.
+ const reference=query('SELECT reference FROM orders LIMIT 1');const tracker=client();
+ let tracking=await tracker('track.php');const trackToken=token(tracking.html);
+ assert.equal((await tracker('track.php',{csrf:'wrong',reference,phone:data.phone})).status,403);
+ tracking=await tracker('track.php',{csrf:trackToken,reference,phone:'01900000000'});assert.match(tracking.html,/could not match/);assert(!tracking.html.includes('Current status:'));
+ tracking=await tracker('track.php',{csrf:trackToken,reference,phone:'+8801712345678'});assert.match(tracking.html,/Current status:/);assert.match(tracking.html,/Pending/);assert(!tracking.html.includes(data.address));assert(!tracking.html.includes('access_token'));
+ for(let n=0;n<9;n++)tracking=await tracker('track.php',{csrf:trackToken,reference:'invalid',phone:data.phone});assert.equal(tracking.status,429,'Tracking lookup must be rate limited');
+ r=await buyer('index.php?q=PASSION&stock=available&size=L');assert.equal((r.html.match(/class="product-card"/g)||[]).length,1);
+ r=await buyer('index.php?q=PASSION&size=XS');assert.equal((r.html.match(/class="product-card"/g)||[]).length,0);
+ r=await buyer('index.php?q=%3Cscript%3E');assert(!r.html.includes('value="<script>"'));assert.match(r.html,/No products match/);
+ r=await owner('admin/index.php');assert.match(r.html,/STOCK ALERTS/);
+ console.log('PASS: order lookup privacy, phone normalization, CSRF, rate limit, search and in-stock size filters.');
  const oid=query('SELECT id FROM orders LIMIT 1');
  r=await owner('admin/order.php?id='+oid);r=await owner('admin/order.php?id='+oid,{csrf:token(r.html),status:'cancelled',delivery_fee:'60',payment_status:'unpaid'});assert.equal(r.status,302);
  assert.equal(query(`SELECT stock FROM variants WHERE product_id=${passion} AND size='L'`),'3');
@@ -79,9 +92,11 @@ try{
  assert.equal(query(`SELECT stock FROM variants WHERE product_id=${passion} AND size='L'`),'3','Cancellation returns stock once');
  // Replace a product photo through the real admin form: it must persist in SQL.
  r=await owner('admin/products.php?id='+passion);
- const form=new FormData();for(const [k,v] of Object.entries({csrf:token(r.html),id:passion,name:'PASSION | True Oversized Hoodie',slug:'fu-passion',price:'1050',category:'Hoodies',description:'Test description',active:'1','sizes[]':'L','stock[L]':'3'}))form.set(k,v);
+ const form=new FormData();for(const [k,v] of Object.entries({csrf:token(r.html),id:passion,name:'PASSION | True Oversized Hoodie',slug:'fu-passion',price:'1050',category:'Hoodies',description:'Test description',active:'1',size_guide:'Measurements in cm: L chest 60, length 72. <script>not HTML</script>','sizes[]':'L','stock[L]':'3'}))form.set(k,v);
  form.set('image',new Blob([readFileSync(resolve(root,'assets/logo.png'))],{type:'image/png'}),'photo.png');
  r=await owner('admin/products.php?id='+passion,form);assert.equal(r.status,302,r.html);
+ r=await buyer('product.php?slug=fu-passion');assert.match(r.html,/Measurements in cm/);assert.match(r.html,/&lt;script&gt;/);assert(!r.html.includes('<script>not HTML'));assert.match(r.html,/More from Hoodies/);
+ assert.equal(query(`SELECT value FROM settings WHERE name='size_guide_${passion}'`),'Measurements in cm: L chest 60, length 72. <script>not HTML</script>');
  const imagePath=query(`SELECT image FROM products WHERE id=${passion}`);assert.match(imagePath,/^image.php/);
  const image=await fetch(base+imagePath);assert.equal(image.headers.get('content-type'),'image/png');assert((await image.arrayBuffer()).byteLength>0);
  assert.equal(query('SELECT COUNT(*) FROM product_images'),'1');
