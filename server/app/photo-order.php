@@ -30,3 +30,11 @@ function product_gallery(array $product):array {
     return array_values(array_unique($photos));
 }
 function product_hover_photo(array $product):?string {return product_gallery($product)[1]??null;}
+
+function product_photo(string $path,int $size=640):string {
+    if(str_starts_with($path,'assets/products/')){
+        $optimized='assets/optimized/'.pathinfo($path,PATHINFO_FILENAME).'-'.$size.'.webp';
+        if(is_file(dirname(__DIR__,2).'/'.$optimized))return $optimized;
+    }
+    return $path;
+}

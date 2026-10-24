@@ -16,8 +16,8 @@ let logs='';for(const s of servers)s.stderr.on('data',b=>logs+=b);
 const base='http://127.0.0.1:18095/';
 function client(){
  const cookies=new Map();
- const request=async(path='',data,port=18095)=>{
-  const headers={cookie:[...cookies].map(([k,v])=>`${k}=${v}`).join('; ')};
+ const request=async(path='',data,port=18095,extraHeaders={})=>{
+  const headers={...extraHeaders,cookie:[...cookies].map(([k,v])=>`${k}=${v}`).join('; ')};
   const form=data instanceof FormData;
   if(data&&!form)headers['Content-Type']='application/x-www-form-urlencoded';
   const r=await fetch(`http://127.0.0.1:${port}/`+path,{redirect:'manual',headers,...(data?{method:'POST',body:form?data:new URLSearchParams(data)}:{})});
@@ -145,6 +145,20 @@ try{
  assert.equal((await deviceB('admin/index.php')).status,302,'Forged token rejected');
  deviceB.cookies.set('flawed_admin_remember',validB);query('UPDATE admin_remember_tokens SET expires_at=DATE_SUB(NOW(),INTERVAL 1 DAY)');deviceB.cookies.delete('flawed_session');
  assert.equal((await deviceB('admin/index.php')).status,302,'Expired token rejected');
+
+ const drawer=client();const jsonHeaders={Accept:'application/json'};
+ let bag=await drawer('cart.php',undefined,18095,jsonHeaders);assert.equal(bag.status,200);assert.equal(JSON.parse(bag.html).count,0);
+ const bagToken=JSON.parse(bag.html).html.match(/data-bag-csrf value="([^"]+)"/)[1];
+ query(`UPDATE variants SET stock=2 WHERE product_id=${passion} AND size='L'`);
+ bag=await drawer('cart.php',{action:'add',csrf:bagToken,product_id:passion,size:'L',quantity:'1'},18095,jsonHeaders);
+ assert.equal(bag.status,200);assert.equal(JSON.parse(bag.html).count,1);assert.match(JSON.parse(bag.html).html,/Added to your bag/);
+ bag=await drawer('cart.php',{action:'update',csrf:bagToken,['qty['+passion+':L]']:'3'},18096,jsonHeaders);
+ assert.equal(bag.status,409);assert.equal(JSON.parse(bag.html).count,1,'Unavailable quantity must not change bag');
+ bag=await drawer('cart.php',{action:'update',csrf:bagToken,['qty['+passion+':L]']:'2'},18096,jsonHeaders);
+ assert.equal(JSON.parse(bag.html).count,2);
+ bag=await drawer('cart.php',{action:'remove',csrf:'wrong',key:passion+':L'},18095,jsonHeaders);assert.equal(bag.status,403);
+ bag=await drawer('cart.php',{action:'remove',csrf:bagToken,key:passion+':L'},18095,jsonHeaders);assert.equal(JSON.parse(bag.html).count,0);
+ console.log('PASS: JSON bag add/update/remove, cross-instance session, unavailable stock and CSRF rejection.');
  console.log('PASS: remembered login across browser sessions/instances, multiple devices, cookie flags, logout revocation, forged/expired tokens.');
  console.log('PASS: setup, 12 products, 46 sizes, categories, protected source routes, cross-instance login/cart sessions, CSRF, sold-out rejection, server pricing, idempotent checkout, stock reservation/cancellation, SQL photo upload, concurrent last-unit checkout, cron authentication.');
  console.log('Isolated test database: '+database+'. No real emails or orders were sent.');

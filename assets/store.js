@@ -33,3 +33,40 @@ const filterProducts=()=>document.querySelectorAll('[data-product-list] .bag-row
  row.hidden=!row.textContent.toLowerCase().includes(productSearch.value.toLowerCase())||(productFilter.value!=='all'&&row.dataset.status!==productFilter.value);
 });
 productSearch?.addEventListener('input',filterProducts);productFilter?.addEventListener('change',filterProducts);
+// A server-backed bag drawer: prices, stock and quantities remain authoritative.
+const bagDrawer=document.getElementById('bag-drawer');
+if(bagDrawer&&typeof bagDrawer.showModal==='function'){
+ const content=bagDrawer.querySelector('[data-bag-content]');let busy=false;let trigger=null;
+ const openBag=(source)=>{trigger=source||document.activeElement;if(!bagDrawer.open){bagDrawer.showModal();document.body.classList.add('bag-is-open');}};
+ const showError=(message)=>{let node=content.querySelector('[role="status"]');if(!node){node=document.createElement('p');node.setAttribute('role','status');content.prepend(node);}node.textContent=message;};
+ const request=async(data)=>{
+  if(busy)return;busy=true;bagDrawer.setAttribute('aria-busy','true');
+  content.querySelectorAll('[data-bag-quantity],[data-bag-remove]').forEach(b=>b.disabled=true);
+  try{
+   const response=await fetch(bagDrawer.dataset.cartUrl,{method:data?'POST':'GET',headers:{Accept:'application/json'},credentials:'same-origin',body:data||undefined});
+   const result=await response.json();
+   if(result.html){content.innerHTML=result.html;document.querySelectorAll('.bag-button span').forEach(n=>n.textContent=String(result.count));content.querySelector('[data-close-bag]')?.focus();}
+   else throw new Error(result.error||'Could not load your bag.');
+  }catch(error){showError(error.message==='Failed to fetch'?'Connection interrupted. Open your bag again to check its contents before retrying.':error.message);}
+  finally{busy=false;bagDrawer.removeAttribute('aria-busy');}
+ };
+ document.querySelectorAll('[data-open-bag]').forEach(link=>link.addEventListener('click',event=>{event.preventDefault();openBag(link);request();}));
+ document.querySelectorAll('[data-add-to-bag]').forEach(form=>form.addEventListener('submit',async event=>{
+  if(event.submitter?.value==='checkout')return;
+  event.preventDefault();if(busy)return;const button=event.submitter;const data=new FormData(form);data.set('destination','cart');
+  if(button)button.disabled=true;openBag(button);await request(data);if(button)button.disabled=false;
+ }));
+ bagDrawer.addEventListener('click',event=>{
+  if(event.target===bagDrawer){const box=bagDrawer.getBoundingClientRect();if(event.clientX<box.left||event.clientX>box.right||event.clientY<box.top||event.clientY>box.bottom)bagDrawer.close();return;}
+  const button=event.target.closest('button');if(!button)return;
+  if(button.hasAttribute('data-close-bag')){bagDrawer.close();return;}
+  if(busy)return;const token=content.querySelector('[data-bag-csrf]')?.value;
+  if(button.hasAttribute('data-bag-remove')||button.hasAttribute('data-bag-quantity')){
+   const data=new FormData();data.set('csrf',token||'');
+   if(button.hasAttribute('data-bag-remove')){data.set('action','remove');data.set('key',button.dataset.bagRemove);}
+   else{data.set('action','update');data.set('qty['+button.dataset.bagKey+']',button.dataset.bagQuantity);}
+   request(data);
+  }
+ });
+ bagDrawer.addEventListener('close',()=>{document.body.classList.remove('bag-is-open');trigger?.focus();});
+}
