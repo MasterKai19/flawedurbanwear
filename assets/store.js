@@ -105,3 +105,10 @@ if(bagDrawer&&typeof bagDrawer.showModal==='function'){
  });
  bagDrawer.addEventListener('close',()=>{document.body.classList.remove('bag-is-open');trigger?.focus();});
 }
+
+const skyToggle=document.querySelector('.sky-toggle');
+if(skyToggle){
+ const skyHero=skyToggle.closest('.hero');
+ skyToggle.addEventListener('click',()=>{const paused=skyHero.classList.toggle('sky-paused');skyToggle.setAttribute('aria-pressed',String(paused));skyToggle.setAttribute('aria-label',paused?'Resume shooting stars':'Pause shooting stars');skyToggle.textContent=paused?'Resume sky':'Pause sky';});
+ if('IntersectionObserver' in window)new IntersectionObserver(entries=>{skyHero.classList.toggle('sky-offscreen',!entries[0].isIntersecting);}).observe(skyHero);
+}
