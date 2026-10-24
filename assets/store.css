@@ -107,3 +107,11 @@ body.bag-is-open{overflow:hidden}#bag-drawer{color:#f4f4f5;background:#101012;bo
 
 /* Fixed vector arrows avoid font-dependent glyphs on iOS. */
 .hero-arrow{display:block;width:20px;height:20px;flex:0 0 20px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}.hero-foot a{display:inline-flex;align-items:center;gap:8px}.hero-arrow-down{width:16px;height:16px;flex-basis:16px}
+
+/* Reference-inspired upright serif wordmark, using local fonts for fast loading. */
+.brand>span,.storefront-theme .brand>span{font-family:"Times New Roman",Times,serif;font-weight:700;font-style:normal;font-size:27px;line-height:.92;letter-spacing:-.6px;text-transform:none;border-left:1px solid currentColor;padding-left:12px}
+.brand small,.storefront-theme .brand small{display:block;font-family:inherit;font-weight:700;font-style:normal;font-size:inherit;line-height:inherit;letter-spacing:inherit;margin-top:3px}
+.footer-brand span{font-family:"Times New Roman",Times,serif;font-weight:700;line-height:.95;letter-spacing:-1px;border-left:1px solid currentColor;padding-left:22px}.footer-brand em{font-style:normal}
+.hero h1,.story h2,.page>h1,.product-title,.policy-heading h1{font-family:"Times New Roman",Times,serif;font-weight:700}
+@media(max-width:700px){.brand>span,.storefront-theme .brand>span{font-size:21px;padding-left:8px}.brand,.storefront-theme .brand{gap:8px}.brand img,.storefront-theme .brand img{width:30px;height:36px}}
+@media(max-width:380px){.brand>span,.storefront-theme .brand>span{font-size:18px}.brand,.storefront-theme .brand{gap:6px}}
