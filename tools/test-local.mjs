@@ -35,7 +35,7 @@ try{
  assert.equal(query('SELECT COUNT(*) FROM cloud_sessions'),'0','Anonymous homepage must not create a database session');
  query("UPDATE settings SET value='1' WHERE name='installation_version'");
  r=await owner('');assert.equal(r.status,200);
- assert.equal(query("SELECT value FROM settings WHERE name='installation_version'"),'4','Existing stores migrate safely');
+ assert.equal(query("SELECT value FROM settings WHERE name='installation_version'"),'5','Existing stores migrate safely');
  assert.equal(query("SELECT image FROM products WHERE sku='FU-LIVING'"),'assets/products/fu-living-01.jpg');
  assert.equal(query("SELECT image FROM products WHERE sku='FU-MIRACLE'"),'assets/products/fu-miracle-05.jpg');
  assert.equal(query("SELECT COUNT(*) FROM products WHERE sku='FU-PASSION' AND back_image IS NULL"),'1');
@@ -175,6 +175,41 @@ try{
  bag=await drawer('cart.php',{action:'remove',csrf:bagToken,key:passion+':L'},18095,jsonHeaders);assert.equal(JSON.parse(bag.html).count,0);
  console.log('PASS: JSON bag add/update/remove, cross-instance session, unavailable stock and CSRF rejection.');
  console.log('PASS: remembered login across browser sessions/instances, multiple devices, cookie flags, logout revocation, forged/expired tokens.');
+ // Additive v4 migration must preserve an owner's photo ordering.
+ query("UPDATE products SET image='assets/products/fu-living-02.jpg' WHERE sku='FU-LIVING'");query("UPDATE settings SET value='4' WHERE name='installation_version'");await buyer('');
+ assert.equal(query("SELECT image FROM products WHERE sku='FU-LIVING'"),'assets/products/fu-living-02.jpg');assert.equal(query("SELECT value FROM settings WHERE name='installation_version'"),'5');
+ let toolsPage=await owner('admin/growth.php?tab=coupons');assert.equal(toolsPage.status,200);
+ assert.equal((await other('admin/growth.php')).status,302);
+ let create=await owner('admin/growth.php?tab=coupons',{csrf:token(toolsPage.html),action:'coupon',code:'TEST-ONE',kind:'percent',amount:'10',min_spend:'100',max_uses:'1',expires:'2099-12-31'});assert.equal(create.status,302);
+ query(`UPDATE variants SET stock=10 WHERE product_id=${passion} AND size='L'`);
+ async function couponBuyer(code){const c=client();let p=await c('product.php?slug=fu-passion');await c('cart.php',{csrf:token(p.html),action:'add',product_id:passion,size:'L',quantity:'1'});p=await c('checkout.php');p=await c('checkout.php',{csrf:token(p.html),checkout_action:'coupon',coupon:code});return {c,p,data:{...data,csrf:token(p.html),checkout_key:p.html.match(/name="checkout_key" value="([^"]+)"/)[1]}};}
+ query("INSERT INTO coupons(code,kind,amount,min_spend,max_uses,expires_at,active) VALUES('EXPIRED','fixed',100,0,5,'2000-01-01',1),('MINIMUM','fixed',100,999999,5,'2099-01-01',1),('DISABLED','fixed',100,0,5,'2099-01-01',0)");
+ for(const code of ['EXPIRED','MINIMUM','DISABLED']){const invalid=await couponBuyer(code);assert.match(invalid.p.html,/expired or unavailable|needs a product subtotal/);assert(!invalid.p.html.includes('Discount · '+code));}
+ const c1=await couponBuyer('TEST-ONE'),c2=await couponBuyer('TEST-ONE');assert.match(c1.p.html,/Discount · TEST-ONE/);
+ const couponRace=await Promise.all([c1.c('checkout.php',c1.data,18095),c2.c('checkout.php',c2.data,18096)]);assert.equal(couponRace.filter(x=>x.status===302).length,1,'A last-use code may only be consumed once');assert.equal(query("SELECT uses FROM coupons WHERE code='TEST-ONE'"),'1');
+ const discountedId=query('SELECT order_id FROM order_discounts LIMIT 1');assert.equal(query(`SELECT total FROM orders WHERE id=${discountedId}`),'1005');assert.equal(query(`SELECT amount FROM order_discounts WHERE order_id=${discountedId}`),'105');
+ const winning=couponRace[0].status===302?c1:c2;await winning.c('checkout.php',winning.data);assert.equal(query('SELECT COUNT(*) FROM order_discounts'),'1','Retry must not use another code');
+ let adminOrder=await owner('admin/order.php?id='+discountedId);await owner('admin/order.php?id='+discountedId,{csrf:token(adminOrder.html),status:'confirmed',delivery_fee:'80',payment_status:'unpaid',consignment_id:'TEST-PATHAO',tracking_url:'https://merchant.pathao.com/'});assert.equal(query(`SELECT total FROM orders WHERE id=${discountedId}`),'1025','Delivery change must retain discount');
+ const discountedToken=query(`SELECT access_token FROM orders WHERE id=${discountedId}`);
+ let privateOrder=await buyer('order.php?token='+discountedToken);assert.match(privateOrder.html,/TEST-PATHAO/);assert.match(privateOrder.html,/Discount/);
+ assert.equal((await buyer('review.php?token='+discountedToken)).status,404,'Undelivered orders cannot review');
+ query(`UPDATE orders SET status='delivered' WHERE id=${discountedId}`);
+ let review=await buyer('review.php?token='+discountedToken);assert.equal(review.status,200);
+ let reviewPost={csrf:token(review.html),product_id:passion,rating:'1',display_name:'Test reviewer',body:'Honest review with <script>text</script>',consent:'1'};
+ review=await buyer('review.php?token='+discountedToken,reviewPost);assert.match(review.html,/awaiting moderation/);
+ assert(!((await buyer('product.php?slug=fu-passion')).html.includes('Test reviewer')),'Pending reviews stay private');
+ assert.match((await buyer('review.php?token='+discountedToken,reviewPost)).html,/already submitted/);
+ const rid=query('SELECT id FROM reviews LIMIT 1');toolsPage=await owner('admin/growth.php?tab=reviews');assert.equal((await owner('admin/growth.php?tab=reviews',{csrf:token(toolsPage.html),action:'review',id:rid,status:'approved'})).status,302);
+ let reviewed=await buyer('product.php?slug=fu-passion');assert.match(reviewed.html,/Test reviewer/);assert.match(reviewed.html,/&lt;script&gt;text/);assert.match(reviewed.html,/1 \/ 5/);
+ let restock=await other('restock.php?id='+living);const restockPost={csrf:token(restock.html),product_id:living,size:'L',email:'restock@example.test',consent:'1'};
+ restock=await other('restock.php?id='+living,restockPost);assert.match(restock.html,/Request saved/);await other('restock.php?id='+living,restockPost);assert.equal(query('SELECT COUNT(*) FROM restock_requests'),'1','Restock requests deduplicate');
+ assert.equal((await other('restock.php?id='+living,{...restockPost,csrf:'wrong'})).status,403);
+ toolsPage=await owner('admin/growth.php?tab=restock');assert.match(toolsPage.html,/restock@example.test/);
+ query(`UPDATE variants SET stock=1 WHERE product_id=${living} AND size='L'`);toolsPage=await owner('admin/growth.php?tab=restock');assert.match(toolsPage.html,/Available now/);
+ assert.match((await other('restock.php?id='+living,restockPost)).html,/already available/);
+ const restockId=query('SELECT id FROM restock_requests LIMIT 1');await owner('admin/growth.php?tab=restock',{csrf:token(toolsPage.html),action:'restock',id:restockId,status:'contacted'});assert.equal(query('SELECT status FROM restock_requests'),'contacted');
+ assert.equal((await owner('admin/growth.php?tab=sales')).status,200);
+ console.log('PASS: additive migration, last-use coupon race, discount totals and retries, Pathao shipment record, verified and moderated reviews, restock consent/CSRF/deduplication and stock status.');
  console.log('PASS: setup, 12 products, 46 sizes, categories, protected source routes, cross-instance login/cart sessions, CSRF, sold-out rejection, server pricing, idempotent checkout, stock reservation/cancellation, SQL photo upload, concurrent last-unit checkout, cron authentication.');
  console.log('Isolated test database: '+database+'. No real emails or orders were sent.');
 }catch(e){console.error(logs.slice(-3000));throw e}

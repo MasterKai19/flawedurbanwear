@@ -11,6 +11,7 @@ session_name('flawed_session');
 session_set_cookie_params(['httponly'=>true,'secure'=>$https,'samesite'=>'Lax','path'=>rtrim($config['base_path'],'/').'/']);
 if(!defined('FLAWED_NO_SESSION')){session_set_save_handler(new CloudSessions(),true);session_start();}
 require_once __DIR__.'/remember.php';
+require_once __DIR__.'/commerce.php';
 if(session_status()===PHP_SESSION_ACTIVE && (($route??'')==='admin'||str_starts_with($route??'','admin/')))admin_restore_device();
 header('X-Content-Type-Options: nosniff'); header('X-Frame-Options: DENY'); header('Referrer-Policy: same-origin');
 header("Content-Security-Policy: default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'self'");
@@ -39,7 +40,7 @@ function cart_items(bool $lock=false): array {
 function cart_subtotal(array $items): int {return array_sum(array_map(fn($p)=>(int)$p['price']*$p['qty'],$items));}
 function render_header(string $title='Flawed Urbanwear',bool $admin=false): void {
     $count=array_sum($_SESSION['cart']??[]);
-    echo '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>'.h($title).' — Flawed Urbanwear</title><meta name="description" content="Flawed Urbanwear. Independent street culture. Est. 2023. Shop clothing online."><link rel="stylesheet" href="'.url('assets/style.css').'"><link rel="stylesheet" href="'.url('assets/store.css?v='.filemtime(dirname(__DIR__,2).'/assets/store.css')).'"></head><body class="' . (!empty($GLOBALS['storefront_theme']) ? 'storefront-theme' : '') . '"><header><a href="'.url().'" class="brand"><img src="'.url('assets/logo.png').'" alt="Flawed logo"><span>Flawed<small>Urbanwear</small></span></a><nav aria-label="Main navigation">';
+    echo '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>'.h($title).' — Flawed Urbanwear</title><meta name="description" content="Flawed Urbanwear. Independent street culture. Est. 2023. Shop clothing online.">'.(!empty($GLOBALS['storefront_theme'])?'<link rel="preload" as="image" href="'.url('assets/hero-fast.webp').'" fetchpriority="high">':'').'<link rel="stylesheet" href="'.url('assets/style.css').'"><link rel="stylesheet" href="'.url('assets/store.css?v='.filemtime(dirname(__DIR__,2).'/assets/store.css')).'"></head><body class="' . (!empty($GLOBALS['storefront_theme']) ? 'storefront-theme' : '') . '"><header><a href="'.url().'" class="brand"><img src="'.url('assets/logo.png').'" alt="Flawed logo"><span>Flawed<small>Urbanwear</small></span></a><nav aria-label="Main navigation">';
     echo $admin?'<a href="'.url('admin/index.php').'">ORDERS</a><a href="'.url('admin/products.php').'">PRODUCTS</a><a href="'.url('admin/settings.php').'">SETTINGS</a>':'<a href="'.url('index.php#shop').'">SHOP</a><a href="'.url('index.php#story').'">OUR WORLD</a>';
     echo '</nav>';
     if($admin)echo '<form method="post" action="'.url('admin/logout.php').'">'.csrf_input().'<button class="text-button">LOG OUT</button></form>';

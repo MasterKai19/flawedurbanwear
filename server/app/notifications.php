@@ -35,6 +35,7 @@ function telegram_order_text(array $payload): string {
     $lines=['Flawed Urbanwear — new order', 'Reference: '.$payload['event_id']];
     foreach($o['items'] as $item)$lines[]=$item['product_name'].' / '.$item['size'].' × '.$item['quantity'];
     $lines[]='Subtotal: BDT '.$o['subtotal'];
+    if(!empty($o['discount']))$lines[]='Discount: BDT '.$o['discount'];
     $lines[]='Delivery: '.($o['delivery_fee']===null?'To be confirmed':'BDT '.$o['delivery_fee']);
     $lines[]='Total: '.($o['total']===null?'Pending delivery fee':'BDT '.$o['total']);
     $lines[]='Payment: '.$o['payment_method'].' / '.$o['payment_status'];
@@ -64,6 +65,7 @@ function notification_enqueue(int $orderId): void {
 function notification_payload(int $orderId): array {
     $o=query('SELECT reference,customer_name,phone,email,address,area,notes,subtotal,delivery_fee,total,status,payment_status,payment_method,created_at FROM orders WHERE id=?',[$orderId])->fetch();
     if(!$o)throw new RuntimeException('Order is unavailable.');
+    $o['discount']=order_discount($orderId);
     $o['items']=query('SELECT product_name,size,unit_price,quantity FROM order_items WHERE order_id=? ORDER BY id',[$orderId])->fetchAll();
     // No private order bearer token, database password, or admin session is sent.
     return ['version'=>1,'event'=>'order.created','event_id'=>$o['reference'],'order'=>$o];

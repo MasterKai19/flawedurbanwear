@@ -1,5 +1,5 @@
 document.querySelectorAll('[data-image]').forEach(button=>button.addEventListener('click',()=>{const img=document.getElementById('main-image');img.src=button.dataset.image;img.alt=button.dataset.alt;document.querySelectorAll('[data-image]').forEach(b=>{b.classList.toggle('active',b===button);b.setAttribute('aria-pressed',b===button?'true':'false')})}));
-const area=document.getElementById('delivery-area');if(area){const update=()=>{const fee=area.selectedOptions[0].dataset.fee;const subtotal=Number(document.getElementById('checkout-subtotal').dataset.subtotal);const known=fee!==undefined&&fee!=='';document.getElementById('delivery-amount').textContent=known?'৳'+Number(fee).toLocaleString():area.value?'To be confirmed':'Select area';document.getElementById('checkout-total').textContent=known?'৳'+(subtotal+Number(fee)).toLocaleString():'Pending delivery';};area.addEventListener('change',update);update();document.getElementById('checkout-form').addEventListener('submit',()=>{const button=document.getElementById('place-order');button.disabled=true;button.textContent='SAVING YOUR ORDER…';});}
+const area=document.getElementById('delivery-area');if(area){const update=()=>{const fee=area.selectedOptions[0].dataset.fee;const subtotal=Number(document.getElementById('checkout-subtotal').dataset.subtotal);const known=fee!==undefined&&fee!=='';document.getElementById('delivery-amount').textContent=known?'৳'+Number(fee).toLocaleString():area.value?'To be confirmed':'Select area';document.getElementById('checkout-total').textContent=known?'৳'+(subtotal+Number(fee)).toLocaleString():'Pending delivery';};area.addEventListener('change',update);update();document.getElementById('checkout-form').addEventListener('submit',event=>{if(event.submitter?.value==='coupon')return;const button=document.getElementById('place-order');button.disabled=true;button.textContent='SAVING YOUR ORDER…';});}
 // Compress admin uploads before sending them, including on hosts without GD.
 document.querySelectorAll('form[enctype="multipart/form-data"]').forEach(form=>{
  let ready=false,busy=false;
@@ -31,7 +31,7 @@ document.querySelectorAll('form[enctype="multipart/form-data"]').forEach(form=>{
    const total=prepared.flatMap(([,files])=>files).reduce((n,f)=>n+f.size,0);
    if(total>3*1024*1024)throw new Error('Photos are still over 3 MB combined after compression. Save fewer photos at a time.');
    for(const [input,files] of prepared){const transfer=new DataTransfer();files.forEach(f=>transfer.items.add(f));input.files=transfer.files;}
-   ready=true;message.textContent='Photos prepared. Saving product…';if(button)button.disabled=false;form.requestSubmit(button||undefined);
+   ready=true;message.textContent='Photos prepared. Submitting…';if(button)button.disabled=false;form.requestSubmit(button||undefined);
   }catch(error){message.textContent=error.message||'Could not prepare photos. Please try smaller JPEG or WebP files.';}
   finally{busy=false;if(button)button.disabled=false;}
  });
