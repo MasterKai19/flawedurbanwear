@@ -32,24 +32,22 @@ try{
  for(let n=0;n<30;n++){try{await (await fetch(base+'assets/store.css')).arrayBuffer();break}catch{await new Promise(r=>setTimeout(r,100))}}
  const owner=client(),buyer=client(),other=client();
  let r=await owner('');assert.equal(r.status,200);
- for(const name of ['LIVING','FLAWED','MEMORIES','GRATEFUL','MIRACLE','JOURNEY']){
-  const photos=JSON.parse(query(`SELECT source_images FROM products WHERE sku='FU-${name}'`));
-  assert.equal(photos[0],`assets/products/fu-${name.toLowerCase()}-mockup-v2-front.webp`);
-  assert.equal(photos[1],`assets/products/fu-${name.toLowerCase()}-mockup-v2-back.webp`);
-  assert(photos.length>2,'Original photographs retained');
- }
- // Repeat a v5 deployment with custom gallery order and verify preservation and idempotence.
- query("DELETE FROM settings WHERE name='catalog_mockups_v2'");
- query("UPDATE settings SET value='5' WHERE name='installation_version'");
- query("UPDATE products SET image='assets/products/fu-living-02.jpg',back_image='assets/products/fu-living-01.jpg',source_images='[\"fu-living-03.jpg\"]' WHERE sku='FU-LIVING'");
+ // Simulate the live v6 mockup gallery and restore originals without disturbing their order.
+ query("DELETE FROM settings WHERE name='catalog_mockups_removed'");
+ query("UPDATE settings SET value='6' WHERE name='installation_version'");
+ const originals=['assets/products/fu-living-01.jpg','assets/products/fu-living-02.jpg','assets/products/fu-living-03.jpg'];
+ const mockups=['assets/products/fu-living-mockup-v2-front.webp','assets/products/fu-living-mockup-v2-back.webp'];
+ query(`UPDATE products SET image='${mockups[0]}',back_image='${mockups[1]}',source_images='${JSON.stringify([...mockups,...originals])}' WHERE sku='FU-LIVING'`);
  await owner('');
  const migrated=JSON.parse(query("SELECT source_images FROM products WHERE sku='FU-LIVING'"));
- assert.deepEqual(migrated.slice(2),['assets/products/fu-living-02.jpg','assets/products/fu-living-01.jpg','assets/products/fu-living-03.jpg']);
+ assert.deepEqual(migrated,originals);
+ assert.equal(query("SELECT image FROM products WHERE sku='FU-LIVING'"),originals[0]);
+ assert.equal(query("SELECT back_image FROM products WHERE sku='FU-LIVING'"),originals[1]);
  await owner('');assert.equal(query("SELECT source_images FROM products WHERE sku='FU-LIVING'"),JSON.stringify(migrated));
  assert.equal(query('SELECT COUNT(*) FROM cloud_sessions'),'0','Anonymous homepage must not create a database session');
  query("UPDATE settings SET value='1' WHERE name='installation_version'");
  r=await owner('');assert.equal(r.status,200);
- assert.equal(query("SELECT value FROM settings WHERE name='installation_version'"),'6','Existing stores migrate safely');
+ assert.equal(query("SELECT value FROM settings WHERE name='installation_version'"),'7','Existing stores migrate safely');
  assert.equal(query("SELECT image FROM products WHERE sku='FU-LIVING'"),'assets/products/fu-living-01.jpg');
  assert.equal(query("SELECT image FROM products WHERE sku='FU-MIRACLE'"),'assets/products/fu-miracle-05.jpg');
  assert.equal(query("SELECT COUNT(*) FROM products WHERE sku='FU-PASSION' AND back_image IS NULL"),'1');
@@ -191,7 +189,7 @@ try{
  console.log('PASS: remembered login across browser sessions/instances, multiple devices, cookie flags, logout revocation, forged/expired tokens.');
  // Additive v4 migration must preserve an owner's photo ordering.
  query("UPDATE products SET image='assets/products/fu-living-02.jpg' WHERE sku='FU-LIVING'");query("UPDATE settings SET value='4' WHERE name='installation_version'");await buyer('');
- assert.equal(query("SELECT image FROM products WHERE sku='FU-LIVING'"),'assets/products/fu-living-02.jpg');assert.equal(query("SELECT value FROM settings WHERE name='installation_version'"),'6');
+ assert.equal(query("SELECT image FROM products WHERE sku='FU-LIVING'"),'assets/products/fu-living-02.jpg');assert.equal(query("SELECT value FROM settings WHERE name='installation_version'"),'7');
  let toolsPage=await owner('admin/growth.php?tab=coupons');assert.equal(toolsPage.status,200);
  assert.equal((await other('admin/growth.php')).status,302);
  let create=await owner('admin/growth.php?tab=coupons',{csrf:token(toolsPage.html),action:'coupon',code:'TEST-ONE',kind:'percent',amount:'10',min_spend:'100',max_uses:'1',expires:'2099-12-31'});assert.equal(create.status,302);

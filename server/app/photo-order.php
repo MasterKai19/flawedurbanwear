@@ -31,26 +31,22 @@ function product_gallery(array $product):array {
 }
 function product_hover_photo(array $product):?string {return product_gallery($product)[1]??null;}
 
-// Apply this requested gallery change once; subsequent admin edits remain authoritative.
-// Called inside initialize_store's transaction and installation lock.
-function add_catalog_mockups():void {
-    if(setting('catalog_mockups_v2')==='1')return;
-    foreach(['LIVING','FLAWED','MEMORIES','GRATEFUL','MIRACLE','JOURNEY'] as $name){
-        $product=query('SELECT * FROM products WHERE sku=? FOR UPDATE',['FU-'.$name])->fetch();
-        if(!$product)continue;
-        $prefix='assets/products/fu-'.strtolower($name).'-mockup-v2-';
-        $front=$prefix.'front.webp';$back=$prefix.'back.webp';
-        foreach([$front,$back] as $path){
-            if(!is_file(dirname(__DIR__,2).'/'.$path))throw new RuntimeException('Missing mockup asset.');
-        }
+// One-time removal preserves every existing real photo and its order.
+function remove_catalog_mockups():void {
+    if(setting('catalog_mockups_removed')==='1')return;
+    foreach(query('SELECT * FROM products FOR UPDATE')->fetchAll() as $product){
         $old=product_gallery($product);
-        query('INSERT INTO settings(name,value) VALUES(?,?) ON DUPLICATE KEY UPDATE value=value',
-            ['mockup_backup_'.$product['id'],json_encode($old)]);
-        $gallery=array_values(array_unique(array_merge([$front,$back],$old)));
+        $gallery=array_values(array_filter($old,fn($path)=>!str_contains($path,'-mockup-v2-')));
+        if($gallery===$old)continue;
+        if(!$gallery){
+            $backup=json_decode(setting('mockup_backup_'.$product['id'])??'[]',true);
+            $gallery=array_values(array_filter(is_array($backup)?$backup:[],fn($path)=>!str_contains($path,'-mockup-v2-')));
+        }
+        if(!$gallery)throw new RuntimeException('Original product photos missing.');
         query('UPDATE products SET image=?,back_image=?,source_images=? WHERE id=?',
-            [$front,$back,json_encode($gallery,JSON_UNESCAPED_SLASHES),$product['id']]);
+            [$gallery[0],$gallery[1]??null,json_encode($gallery,JSON_UNESCAPED_SLASHES),$product['id']]);
     }
-    query("INSERT INTO settings(name,value) VALUES('catalog_mockups_v2','1') ON DUPLICATE KEY UPDATE value='1'");
+    query("INSERT INTO settings(name,value) VALUES('catalog_mockups_removed','1') ON DUPLICATE KEY UPDATE value='1'");
 }
 
 function product_photo(string $path,int $size=640):string {
