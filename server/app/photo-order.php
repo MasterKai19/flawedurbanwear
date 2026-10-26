@@ -56,3 +56,17 @@ function product_photo(string $path,int $size=640):string {
     }
     return $path;
 }
+
+function product_srcset(string $path): string {
+    $sources=[];
+    foreach([240,480,640,960,1280] as $width){
+        $photo=product_photo($path,$width);
+        if($photo!==$path){$dimensions=getimagesize(dirname(__DIR__,2).'/'.$photo);if($dimensions)$sources[$dimensions[0]]=url($photo).' '.$dimensions[0].'w';}
+    }
+    return implode(', ',$sources);
+}
+function product_fact(array $product,string $label): string {
+    $description=(string)($product['description']??'');
+    if(preg_match('/(?:^|\n)\s*(?:•\s*)?'.preg_quote($label,'/').':\s*([^\r\n]+)/iu',$description,$match))return trim($match[1]);
+    return '';
+}

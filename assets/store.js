@@ -1,4 +1,4 @@
-document.querySelectorAll('[data-image]').forEach(button=>button.addEventListener('click',()=>{const img=document.getElementById('main-image');img.src=button.dataset.image;img.alt=button.dataset.alt;document.querySelectorAll('[data-image]').forEach(b=>{b.classList.toggle('active',b===button);b.setAttribute('aria-pressed',b===button?'true':'false')})}));
+document.querySelectorAll('[data-image]').forEach(button=>button.addEventListener('click',()=>{const img=document.getElementById('main-image');img.srcset=button.dataset.srcset||'';img.src=button.dataset.image;img.alt=button.dataset.alt;document.querySelectorAll('[data-image]').forEach(b=>{b.classList.toggle('active',b===button);b.setAttribute('aria-pressed',b===button?'true':'false')})}));
 const area=document.getElementById('delivery-area');if(area){const update=()=>{const fee=area.selectedOptions[0].dataset.fee;const subtotal=Number(document.getElementById('checkout-subtotal').dataset.subtotal);const known=fee!==undefined&&fee!=='';document.getElementById('delivery-amount').textContent=known?'৳'+Number(fee).toLocaleString():area.value?'To be confirmed':'Select area';document.getElementById('checkout-total').textContent=known?'৳'+(subtotal+Number(fee)).toLocaleString():'Pending delivery';};area.addEventListener('change',update);update();document.getElementById('checkout-form').addEventListener('submit',event=>{if(event.submitter?.value==='coupon')return;const button=document.getElementById('place-order');button.disabled=true;button.textContent='SAVING YOUR ORDER…';});}
 // Compress admin uploads before sending them, including on hosts without GD.
 document.querySelectorAll('form[enctype="multipart/form-data"]').forEach(form=>{
@@ -111,4 +111,18 @@ if(skyToggle){
  const skyHero=skyToggle.closest('.hero');
  skyToggle.addEventListener('click',()=>{const paused=skyHero.classList.toggle('sky-paused');skyToggle.setAttribute('aria-pressed',String(paused));skyToggle.setAttribute('aria-label',paused?'Resume shooting stars':'Pause shooting stars');skyToggle.textContent=paused?'Resume sky':'Pause sky';});
  if('IntersectionObserver' in window)new IntersectionObserver(entries=>{skyHero.classList.toggle('sky-offscreen',!entries[0].isIntersecting);}).observe(skyHero);
+}
+
+// The quick bar submits the existing form, preserving stock checks and cart behaviour.
+{
+ const form=document.getElementById('product-buy-form'),bar=document.querySelector('.mobile-buy-bar'),select=document.getElementById('mobile-buy-size');
+ if(form&&bar&&select){
+  bar.hidden=false;document.body.classList.add('has-mobile-buy');
+  const radios=[...form.querySelectorAll('input[name="size"]')];
+  const sync=()=>{select.value=radios.find(r=>r.checked)?.value||'';};
+  select.addEventListener('change',()=>{radios.forEach(r=>r.checked=r.value===select.value);});
+  radios.forEach(r=>r.addEventListener('change',sync));sync();
+  bar.querySelector('button').addEventListener('click',event=>{if(!select.value){event.preventDefault();select.focus();select.setCustomValidity('Choose a size first.');select.reportValidity();}});
+  select.addEventListener('change',()=>select.setCustomValidity(''));
+ }
 }

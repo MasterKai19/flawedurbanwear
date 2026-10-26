@@ -75,7 +75,7 @@ try{
  r=await buyer('cart.php',{csrf:token(r.html),action:'add',product_id:living,size:'L',quantity:'1'});assert.equal(r.status,302);
  r=await buyer('cart.php');assert.match(r.html,/unavailable/);
  assert.equal((await buyer('cart.php',{csrf:'invalid',action:'add',product_id:passion,size:'L',quantity:'1'})).status,403);
- r=await buyer('product.php?slug=fu-passion');
+ r=await buyer('product.php?slug=fu-passion');assert.match(r.html,/id="mobile-buy-size"/);assert.match(r.html,/FABRIC &amp; FIT/);assert.match(r.html,/WASHING &amp; CARE/);assert.match(r.html,/srcset="[^"]+480.webp/);
  r=await buyer('cart.php',{csrf:token(r.html),action:'add',product_id:passion,size:'L',quantity:'1'});assert.equal(r.status,302);
  r=await buyer('checkout.php',undefined,18096);assert.match(r.html,/PASSION/);
  const checkoutKey=r.html.match(/name="checkout_key" value="([^"]+)"/)[1];
@@ -104,10 +104,10 @@ try{
  assert.equal(query(`SELECT stock FROM variants WHERE product_id=${passion} AND size='L'`),'3','Cancellation returns stock once');
  // Replace a product photo through the real admin form: it must persist in SQL.
  r=await owner('admin/products.php?id='+passion);
- const form=new FormData();for(const [k,v] of Object.entries({csrf:token(r.html),id:passion,name:'PASSION | True Oversized Hoodie',slug:'fu-passion',price:'1050',category:'Hoodies',description:'Test description',active:'1',size_guide:'Measurements in cm: L chest 60, length 72. <script>not HTML</script>','sizes[]':'L','stock[L]':'3'}))form.set(k,v);
+ const form=new FormData();for(const [k,v] of Object.entries({csrf:token(r.html),id:passion,name:'PASSION | True Oversized Hoodie',slug:'fu-passion',price:'1050',category:'Hoodies',description:'Test description',fabric:'Cotton test',fit:'Relaxed test',care:'Cold wash test <script>safe</script>',active:'1',size_guide:'Measurements in cm: L chest 60, length 72. <script>not HTML</script>','sizes[]':'L','stock[L]':'3'}))form.set(k,v);
  form.set('image',new Blob([readFileSync(resolve(root,'assets/logo.png'))],{type:'image/png'}),'photo.png');
  r=await owner('admin/products.php?id='+passion,form);assert.equal(r.status,302,r.html);
- r=await buyer('product.php?slug=fu-passion');assert.match(r.html,/Measurements in cm/);assert.match(r.html,/&lt;script&gt;/);assert(!r.html.includes('<script>not HTML'));assert.match(r.html,/More from Hoodies/);
+ r=await buyer('product.php?slug=fu-passion');assert.match(r.html,/id="mobile-buy-size"/);assert.match(r.html,/FABRIC &amp; FIT/);assert.match(r.html,/WASHING &amp; CARE/);assert.match(r.html,/srcset="[^"]+480.webp/);assert.match(r.html,/Cotton test/);assert.match(r.html,/Relaxed test/);assert.match(r.html,/Cold wash test &lt;script&gt;safe/);assert.match(r.html,/Measurements in cm/);assert.match(r.html,/&lt;script&gt;/);assert(!r.html.includes('<script>not HTML'));assert.match(r.html,/More from Hoodies/);
  assert.equal(query(`SELECT value FROM settings WHERE name='size_guide_${passion}'`),'Measurements in cm: L chest 60, length 72. <script>not HTML</script>');
  const imagePath=query(`SELECT image FROM products WHERE id=${passion}`);assert.match(imagePath,/^image.php/);
  const image=await fetch(base+imagePath);assert.equal(image.headers.get('content-type'),'image/png');assert((await image.arrayBuffer()).byteLength>0);

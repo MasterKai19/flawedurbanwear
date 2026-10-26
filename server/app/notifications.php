@@ -32,17 +32,33 @@ function telegram_recent_chats(): array {
 }
 function telegram_order_text(array $payload): string {
     $o=$payload['order'];
-    $lines=['Flawed Urbanwear — new order', 'Reference: '.$payload['event_id']];
-    foreach($o['items'] as $item)$lines[]=$item['product_name'].' / '.$item['size'].' × '.$item['quantity'];
+    $lines=['Flawed Urbanwear — new order', 'Reference: '.$payload['event_id'],
+        'Placed: '.($o['created_at']??'Not supplied'), 'Name: '.($o['customer_name']??''),
+        'Phone: '.($o['phone']??''), 'Email: '.(($o['email']??'')?:'Not supplied'),
+        'Address: '.($o['address']??''), 'Delivery area: '.($o['area']??''), '', 'Items:'];
+    $quantity=0;
+    foreach($o['items'] as $item){
+        $quantity+=(int)$item['quantity'];
+        $lines[]=$item['product_name'].' / '.$item['size'].' × '.$item['quantity'];
+        $lines[]='Unit: BDT '.$item['unit_price'].' · Line total: BDT '.((int)$item['unit_price']*(int)$item['quantity']);
+    }
+    $lines[]='Total quantity: '.$quantity;
     $lines[]='Subtotal: BDT '.$o['subtotal'];
     if(!empty($o['discount']))$lines[]='Discount: BDT '.$o['discount'];
-    $lines[]='Delivery: '.($o['delivery_fee']===null?'To be confirmed':'BDT '.$o['delivery_fee']);
+    $lines[]='Delivery charge: '.($o['delivery_fee']===null?'To be confirmed':'BDT '.$o['delivery_fee']);
     $lines[]='Total: '.($o['total']===null?'Pending delivery fee':'BDT '.$o['total']);
-    $lines[]='Payment: '.$o['payment_method'].' / '.$o['payment_status'];
-    // Keep customer contact details and private order access tokens in the admin dashboard.
+    $lines[]='Payment: '.($o['payment_method']==='cod'?'Cash on delivery':$o['payment_method']).' / '.$o['payment_status'];
+    $lines[]='Order status: '.($o['status']??'pending');
+    $lines[]='Customer notes: '.(($o['notes']??'')?:'None');
     $lines[]='View order: https://flawedurbanwear.vercel.app/admin/index.php';
-    $text=implode("\n",$lines);
-    return mb_strlen($text,'UTF-8')>4000?mb_substr($text,0,3800,'UTF-8')."\nMore items in the admin dashboard.":$text;
+    return implode("\n",$lines);
+}
+function telegram_order_messages(array $payload): array {
+    // Leave ample room for continuation headings and Telegram's UTF-16 limit.
+    $text=telegram_order_text($payload);$chunks=mb_str_split($text,1800,'UTF-8');
+    if(count($chunks)===1)return $chunks;
+    return array_map(fn($chunk,$i)=>'Order '.$payload['event_id'].' — part '.($i+1).'/'.count($chunks)."\n".$chunk,$chunks,array_keys($chunks));
+
 }
 function telegram_request(string $text): void {
     if(!telegram_ready())throw new RuntimeException('Set TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID in Vercel and redeploy.');
@@ -97,7 +113,7 @@ function notification_send(int $orderId, ?callable $transport=null): bool {
         if(telegram_ready()){
             $payload=notification_payload($orderId);
             if($transport){$result=$transport($payload);if(($result['ok']??false)!==true)throw new RuntimeException('Telegram delivery failed.');}
-            else telegram_request(telegram_order_text($payload));
+            else foreach(telegram_order_messages($payload) as $message)telegram_request($message);
             query("UPDATE order_notifications SET status='sent',sent_at=NOW(),lease_until=NULL,next_attempt_at=NULL,last_error=NULL WHERE order_id=?",[$orderId]);
             return true;
         }
