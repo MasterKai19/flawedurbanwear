@@ -5,7 +5,7 @@ document.querySelectorAll('form[enctype="multipart/form-data"]').forEach(form=>{
  let ready=false,busy=false;
  const message=document.createElement('p');message.className='hint';message.setAttribute('role','status');form.append(message);
  form.addEventListener('submit',async event=>{
-  if(ready)return;event.preventDefault();if(busy)return;busy=true;
+  if(ready||![...form.querySelectorAll('input[type="file"]')].some(input=>input.files.length))return;event.preventDefault();if(busy)return;busy=true;
   const button=event.submitter;const inputs=[...form.querySelectorAll('input[type="file"]')];
   if(button)button.disabled=true;message.textContent='Preparing photos…';
   try{
@@ -149,3 +149,44 @@ if(skyToggle){
   motion.addEventListener('change',finish);type();
  }
 }
+
+// Load the enlarged photo only on demand; native dialog handles focus and Escape.
+{
+ const trigger=document.querySelector('.photo-zoom-open'),main=document.getElementById('main-image');
+ if(trigger&&main&&typeof HTMLDialogElement!=='undefined'){
+  const dialog=document.createElement('dialog');dialog.className='photo-zoom-dialog';dialog.setAttribute('aria-label','Product photo viewer');
+  const controls=document.createElement('div');controls.className='photo-zoom-controls';
+  const makeButton=(text,label)=>{const b=document.createElement('button');b.type='button';b.textContent=text;b.setAttribute('aria-label',label);controls.append(b);return b;};
+  const previous=makeButton('←','Previous photo'),next=makeButton('→','Next photo'),zoom=makeButton('Zoom in','Zoom in'),close=makeButton('Close ×','Close photo viewer');
+  const counter=document.createElement('span');counter.setAttribute('aria-live','polite');controls.append(counter);
+  const stage=document.createElement('div');stage.className='photo-zoom-stage';stage.tabIndex=0;stage.setAttribute('aria-label','Photo. Scroll to pan when zoomed.');
+  const image=document.createElement('img');image.decoding='async';stage.append(image);dialog.append(controls,stage);document.body.append(dialog);
+  const views=[...document.querySelectorAll('[data-image]')];let index=0;
+  const reset=()=>{stage.classList.remove('is-magnified');zoom.textContent='Zoom in';zoom.setAttribute('aria-label','Zoom in');zoom.setAttribute('aria-pressed','false');stage.scrollTop=stage.scrollLeft=0;};
+  const show=()=>{reset();image.src=main.src;image.alt=main.alt;counter.textContent=(index+1)+' / '+Math.max(1,views.length);previous.disabled=next.disabled=views.length<2;};
+  const move=direction=>{if(views.length<2)return;index=(index+direction+views.length)%views.length;views[index].click();show();};
+  trigger.hidden=false;
+  trigger.addEventListener('click',()=>{index=Math.max(0,views.findIndex(v=>v.classList.contains('active')));show();dialog.showModal();document.body.classList.add('photo-viewer-open');close.focus();});
+  const toggle=()=>{const enlarged=stage.classList.toggle('is-magnified');zoom.textContent=enlarged?'Zoom out':'Zoom in';zoom.setAttribute('aria-label',zoom.textContent);zoom.setAttribute('aria-pressed',String(enlarged));};
+  zoom.addEventListener('click',toggle);image.addEventListener('click',toggle);
+  previous.addEventListener('click',()=>move(-1));next.addEventListener('click',()=>move(1));close.addEventListener('click',()=>dialog.close());
+  dialog.addEventListener('keydown',event=>{if(event.key==='ArrowLeft'||event.key==='ArrowRight'){event.preventDefault();move(event.key==='ArrowLeft'?-1:1);}});
+  dialog.addEventListener('close',()=>{document.body.classList.remove('photo-viewer-open');image.removeAttribute('src');reset();trigger.focus();});
+ }
+}
+
+// Save one visibility flag without reloading the editor or submitting its other fields.
+ document.querySelectorAll('[data-visibility-form]').forEach(form=>{
+  const checkbox=form.querySelector('[name="visible"]'),status=form.querySelector('[data-visibility-status]'),row=form.closest('.product-list-row');
+  form.querySelector('button').hidden=true;
+  checkbox.addEventListener('change',async()=>{
+   const value=checkbox.checked,data=new URLSearchParams(new FormData(form));checkbox.disabled=true;status.textContent='Saving…';
+   try{
+    const response=await fetch(form.getAttribute('action')||location.href,{method:'POST',headers:{'Accept':'application/json'},body:data,credentials:'same-origin'});
+    if(!response.ok)throw new Error('Save failed');const result=await response.json();if(result.ok!==true)throw new Error('Save failed');
+    checkbox.checked=result.visible;row.dataset.status=result.visible?'visible':'hidden';row.querySelector('[data-product-visibility]').textContent=result.visible?'Visible':'Hidden / archived';status.textContent='Saved';
+    if(typeof filterProducts==='function')filterProducts();
+   }catch(error){checkbox.checked=!value;status.textContent='Could not save. Refresh your login and try again.';}
+   finally{checkbox.disabled=false;}
+  });
+ });

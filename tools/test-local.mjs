@@ -221,6 +221,20 @@ try{
  assert.match((await other('restock.php?id='+living,restockPost)).html,/already available/);
  const restockId=query('SELECT id FROM restock_requests LIMIT 1');await owner('admin/growth.php?tab=restock',{csrf:token(toolsPage.html),action:'restock',id:restockId,status:'contacted'});assert.equal(query('SELECT status FROM restock_requests'),'contacted');
  assert.equal((await owner('admin/growth.php?tab=sales')).status,200);
+
+ let visibilityPage=await owner('admin/products.php?id='+living);
+ const visibilityData={csrf:token(visibilityPage.html),id:living,action:'visibility',visible:'0'};
+ let visibilityResult=await owner('admin/products.php?id='+living,visibilityData,18095,{'Accept':'application/json'});assert.equal(JSON.parse(visibilityResult.html).visible,false);
+ assert.equal(query(`SELECT active FROM products WHERE id=${living}`),'0');
+ assert.equal((await other('admin/products.php',visibilityData,18095,{'Accept':'application/json'})).status,302);
+ assert.equal((await owner('admin/products.php',{...visibilityData,csrf:'bad'},18095,{'Accept':'application/json'})).status,403);
+ visibilityResult=await owner('admin/products.php?id='+living,{...visibilityData,visible:'1'},18095,{'Accept':'application/json'});assert.equal(JSON.parse(visibilityResult.html).visible,true);
+ assert.equal((await other('admin/sales.php')).status,302);
+ query("UPDATE orders SET status='cancelled',payment_status='paid',total=99999");
+ const saleId=query('SELECT MIN(id) FROM orders');query(`UPDATE orders SET status='delivered',subtotal=1000,total=970,delivery_fee=70,created_at=UTC_TIMESTAMP() WHERE id=${saleId}`);
+ query(`INSERT INTO order_discounts(order_id,coupon_id,code,amount) VALUES(${saleId},(SELECT MIN(id) FROM coupons),'REPORT-TEST',100) ON DUPLICATE KEY UPDATE amount=100`);
+ const report=await owner('admin/sales.php?days=7');assert.equal(report.status,200);assert.match(report.html,/৳900/);assert.match(report.html,/৳970/);assert(!report.html.includes('৳99,999'));assert.match(report.html,/Stock by size/);
+ console.log('PASS: paid sales exclude cancellations and discounts; visibility toggle, CSRF and admin access.');
  console.log('PASS: additive migration, last-use coupon race, discount totals and retries, Pathao shipment record, verified and moderated reviews, restock consent/CSRF/deduplication and stock status.');
  console.log('PASS: setup, 12 products, 46 sizes, categories, protected source routes, cross-instance login/cart sessions, CSRF, sold-out rejection, server pricing, idempotent checkout, stock reservation/cancellation, SQL photo upload, concurrent last-unit checkout, cron authentication.');
  console.log('Isolated test database: '+database+'. No real emails or orders were sent.');
