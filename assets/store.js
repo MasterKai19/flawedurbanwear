@@ -126,3 +126,26 @@ if(skyToggle){
   select.addEventListener('change',()=>select.setCustomValidity(''));
  }
 }
+
+// One short reveal; reserve every letter's space to avoid layout shifts.
+{
+ const title=document.querySelector('[data-typewriter]');
+ const motion=matchMedia('(prefers-reduced-motion: reduce)');
+ if(title&&!motion.matches){
+  const letters=[];
+  title.querySelectorAll('[data-type-line]').forEach(line=>{
+   const text=line.textContent;line.textContent='';
+   Array.from(text).forEach(character=>{const span=document.createElement('span');span.className='type-letter';span.textContent=character;line.append(span);letters.push(span);});
+  });
+  title.classList.add('typewriter-running');
+  let index=0,timer;
+  const finish=()=>{clearTimeout(timer);title.classList.remove('typewriter-running');letters.forEach(letter=>letter.classList.remove('type-caret'));motion.removeEventListener('change',finish);};
+  const type=()=>{
+   if(index)letters[index-1].classList.remove('type-caret');
+   if(index===letters.length){finish();return;}
+   letters[index].classList.add('type-visible','type-caret');index++;
+   timer=setTimeout(type,index===9?260:85);
+  };
+  motion.addEventListener('change',finish);type();
+ }
+}
