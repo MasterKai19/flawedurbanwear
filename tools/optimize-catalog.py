@@ -11,3 +11,7 @@ for source in (root / "assets/products").glob("*.jpg"):
             scaled = image.copy()
             scaled.thumbnail((width, width), Image.Resampling.LANCZOS)
             scaled.save(output / f"{source.stem}-{width}.webp", "WEBP", quality=78, method=6)
+
+            target = output / f"{source.stem}-{width}.webp"
+            if width == 1280 and target.stat().st_size > 150000:
+                scaled.save(target, "WEBP", quality=68, method=6)
