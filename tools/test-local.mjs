@@ -234,6 +234,16 @@ try{
  const saleId=query('SELECT MIN(id) FROM orders');query(`UPDATE orders SET status='delivered',subtotal=1000,total=970,delivery_fee=70,created_at=UTC_TIMESTAMP() WHERE id=${saleId}`);
  query(`INSERT INTO order_discounts(order_id,coupon_id,code,amount) VALUES(${saleId},(SELECT MIN(id) FROM coupons),'REPORT-TEST',100) ON DUPLICATE KEY UPDATE amount=100`);
  const report=await owner('admin/sales.php?days=7');assert.equal(report.status,200);assert.match(report.html,/৳900/);assert.match(report.html,/৳970/);assert(!report.html.includes('৳99,999'));assert.match(report.html,/Stock by size/);
+
+ const backupSettings=await owner('admin/settings.php');
+ assert.equal((await other('admin/backup.php',{csrf:token(backupSettings.html)})).status,302);
+ assert.equal((await owner('admin/backup.php',{csrf:'wrong'})).status,403);
+ assert.equal((await owner('admin/backup.php')).status,405);
+ const dump=await owner('admin/backup.php',{csrf:token(backupSettings.html)});assert.equal(dump.status,200);assert(dump.html.endsWith('-- Backup complete.\n'));
+ const restored=database+'_restore';sql(`CREATE DATABASE ${restored} CHARACTER SET utf8mb4`);
+ execFileSync(mysql,['--default-character-set=utf8mb4','--host=127.0.0.1','--port=13317','--user=root',restored],{input:dump.html,encoding:'utf8'});
+ for(const table of ['products','orders','variants','settings','admins','product_images'])assert.equal(sql(`SELECT COUNT(*) FROM ${restored}.${table}`),query(`SELECT COUNT(*) FROM ${table}`),'restored '+table);
+ console.log('PASS: private SQL download, CSRF, and restore into a separate database.');
  console.log('PASS: paid sales exclude cancellations and discounts; visibility toggle, CSRF and admin access.');
  console.log('PASS: additive migration, last-use coupon race, discount totals and retries, Pathao shipment record, verified and moderated reviews, restock consent/CSRF/deduplication and stock status.');
  console.log('PASS: setup, 12 products, 46 sizes, categories, protected source routes, cross-instance login/cart sessions, CSRF, sold-out rejection, server pricing, idempotent checkout, stock reservation/cancellation, SQL photo upload, concurrent last-unit checkout, cron authentication.');

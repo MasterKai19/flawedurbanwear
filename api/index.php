@@ -11,7 +11,7 @@ if(PHP_SAPI==='cli-server'&&preg_match('~^assets/[a-zA-Z0-9_./-]+\.(css|js|png|j
     }
 }
 $routes=[''=>'index.php','index.php'=>'index.php','product.php'=>'product.php','cart.php'=>'cart.php','checkout.php'=>'checkout.php','order.php'=>'order.php','track.php'=>'track.php','review.php'=>'review.php','restock.php'=>'restock.php','info.php'=>'info.php','setup.php'=>'setup.php','image.php'=>'image.php','cron/notifications'=>'cron.php','admin'=>'admin/index.php'];
-foreach(['index','login','logout','order','products','settings','notifications','export','growth','sales'] as $name)$routes['admin/'.$name.'.php']='admin/'.$name.'.php';
+foreach(['index','login','logout','order','products','settings','notifications','export','growth','sales','backup'] as $name)$routes['admin/'.$name.'.php']='admin/'.$name.'.php';
 if(!isset($routes[$route])){http_response_code(404);header('Content-Type: text/plain');echo 'Page not found.';exit;}
 // Browsing without a cart needs no database-backed session, locks or cookie.
 // Product forms, carts, checkout and all admin routes retain full sessions/CSRF.
