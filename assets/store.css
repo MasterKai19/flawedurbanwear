@@ -153,3 +153,14 @@ body.bag-is-open{overflow:hidden}#bag-drawer{color:#f4f4f5;background:#101012;bo
 
 .product-list-row{flex-wrap:wrap}.product-list-link{display:flex;align-items:center;gap:14px;flex:1;min-width:180px}.product-list-row form{margin:0;min-width:90px}.product-list-row .check-label{margin:0;align-items:center;cursor:pointer;color:inherit;min-height:44px}.product-list-row input[type="checkbox"]{accent-color:#d51d32;width:22px!important;height:22px;margin:0}.product-list-row small[role="status"]{display:block;max-width:180px;font-size:11px;line-height:1.4}.product-list-row[hidden]{display:none}
 .photo-zoom-dialog{inset:0;margin:auto;height:fit-content;max-height:95vh;max-height:95dvh}
+
+/* Lightweight, accessible storefront offer ticker. */
+.delivery-ticker{display:flex;align-items:center;background:#cb1728;color:#fff;height:34px;overflow:hidden;font:700 10px/1 Arial,sans-serif;letter-spacing:1.5px}
+.delivery-ticker-window{flex:1;overflow:hidden;min-width:0}
+.delivery-ticker-track{display:flex;width:max-content;animation:delivery-news 32s linear infinite}
+.delivery-ticker-track>span{width:340px;flex:0 0 340px;text-align:center;white-space:nowrap}
+.delivery-ticker-track b{font-weight:800}.delivery-ticker-track i{font-style:normal;margin-left:35px}
+.delivery-ticker button{align-self:stretch;width:38px;flex:0 0 38px;background:#a90f20;border:0;border-left:1px solid #ffffff40;color:white;cursor:pointer;font-size:14px}
+.delivery-ticker:hover .delivery-ticker-track,.delivery-ticker:focus-within .delivery-ticker-track,.delivery-ticker.paused .delivery-ticker-track{animation-play-state:paused}
+@keyframes delivery-news{to{transform:translateX(-50%)}}
+@media(prefers-reduced-motion:reduce){.delivery-ticker-track{animation:none}.delivery-ticker-track>span{width:auto;flex-basis:auto;padding:0 14px}.delivery-ticker-track>span~span,.delivery-ticker button,.delivery-ticker-track i{display:none}}

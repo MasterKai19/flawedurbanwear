@@ -222,6 +222,17 @@ try{
  const restockId=query('SELECT id FROM restock_requests LIMIT 1');await owner('admin/growth.php?tab=restock',{csrf:token(toolsPage.html),action:'restock',id:restockId,status:'contacted'});assert.equal(query('SELECT status FROM restock_requests'),'contacted');
  assert.equal((await owner('admin/growth.php?tab=sales')).status,200);
 
+ // The two-hoodie offer is calculated on the server for both delivery zones.
+ query(`UPDATE products SET active=1 WHERE id=${passion}`);
+ query(`UPDATE variants SET stock=20 WHERE product_id=${passion} AND size='L'`);
+ for(const area of ['dhaka','outside']){
+  const promo=client();let page=await promo('product.php?slug=fu-passion');
+  await promo('cart.php',{csrf:token(page.html),action:'add',product_id:passion,size:'L',quantity:'2'});
+  page=await promo('checkout.php');assert.match(page.html,/Free delivery applied/);assert.match(page.html,/value="outside" data-fee="0"/);
+  const placed=await promo('checkout.php',{...data,csrf:token(page.html),checkout_key:page.html.match(/name="checkout_key" value="([^"]+)"/)[1],area,delivery_fee:'999'});
+  assert.equal(placed.status,302);assert.equal(query('SELECT delivery_fee FROM orders ORDER BY id DESC LIMIT 1'),'0');
+  assert.equal(query('SELECT total=subtotal FROM orders ORDER BY id DESC LIMIT 1'),'1');
+ }
  let visibilityPage=await owner('admin/products.php?id='+living);
  const visibilityData={csrf:token(visibilityPage.html),id:living,action:'visibility',visible:'0'};
  let visibilityResult=await owner('admin/products.php?id='+living,visibilityData,18095,{'Accept':'application/json'});assert.equal(JSON.parse(visibilityResult.html).visible,false);
