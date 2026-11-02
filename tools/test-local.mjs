@@ -68,7 +68,7 @@ try{
  r=await owner('admin/login.php');r=await owner('admin/login.php',{csrf:token(r.html),email:'test-owner@example.test',password:'Only-Test-Password-42'});
  assert.equal(r.status,302);
  r=await owner('admin/index.php',undefined,18096);assert.equal(r.status,200,'Session must survive a different function instance');
- r=await owner('admin/settings.php');r=await owner('admin/settings.php',{csrf:token(r.html),dhaka:'60',outside:'120',estimate_dhaka:'2–3 working days',estimate_outside:'4–5 working days'});assert.equal(r.status,302);
+ r=await owner('admin/settings.php');r=await owner('admin/settings.php',{csrf:token(r.html),dhaka:'80',outside:'120',estimate_dhaka:'2–3 working days',estimate_outside:'4–5 working days'});assert.equal(r.status,302);
  assert.equal(query("SELECT value FROM settings WHERE name='delivery_estimate_dhaka'"),'2–3 working days');
  const passion=query("SELECT id FROM products WHERE sku='FU-PASSION'"),living=query("SELECT id FROM products WHERE sku='FU-LIVING'");
  r=await buyer('product.php?slug=living-tee');assert.match(r.html,/SOLD OUT/);assert(!r.html.includes('BUY NOW'));
@@ -82,7 +82,7 @@ try{
  const data={csrf:token(r.html),checkout_key:checkoutKey,name:'Test Customer',phone:'01712345678',address:'Test delivery address Dhaka',agree:'1'};
  r=await buyer('checkout.php',data);assert.equal(r.status,302,r.html);
  assert.equal(query(`SELECT stock FROM variants WHERE product_id=${passion} AND size='L'`),'2');
- assert.equal(query('SELECT total FROM orders'),'NULL');assert.equal(query('SELECT delivery_fee FROM orders'),'NULL');assert.equal(query('SELECT area FROM orders'),'To be confirmed');
+ assert.equal(query('SELECT total FROM orders'),'1130');assert.equal(query('SELECT delivery_fee FROM orders'),'80');assert.equal(query('SELECT area FROM orders'),'dhaka');
  assert.equal(query('SELECT COUNT(*) FROM order_notifications'),'1');
  r=await buyer('checkout.php',data);assert.equal(r.status,302);assert.equal(query('SELECT COUNT(*) FROM orders'),'1','Duplicate checkout must not create another order');
  // Public tracking requires both details and does not reveal private fields.
@@ -199,7 +199,7 @@ try{
  for(const code of ['EXPIRED','MINIMUM','DISABLED']){const invalid=await couponBuyer(code);assert.match(invalid.p.html,/expired or unavailable|needs a product subtotal/);assert(!invalid.p.html.includes('Discount · '+code));}
  const c1=await couponBuyer('TEST-ONE'),c2=await couponBuyer('TEST-ONE');assert.match(c1.p.html,/Discount · TEST-ONE/);
  const couponRace=await Promise.all([c1.c('checkout.php',c1.data,18095),c2.c('checkout.php',c2.data,18096)]);assert.equal(couponRace.filter(x=>x.status===302).length,1,'A last-use code may only be consumed once');assert.equal(query("SELECT uses FROM coupons WHERE code='TEST-ONE'"),'1');
- const discountedId=query('SELECT order_id FROM order_discounts LIMIT 1');assert.equal(query(`SELECT total FROM orders WHERE id=${discountedId}`),'NULL');assert.equal(query(`SELECT amount FROM order_discounts WHERE order_id=${discountedId}`),'105');
+ const discountedId=query('SELECT order_id FROM order_discounts LIMIT 1');assert.equal(query(`SELECT total FROM orders WHERE id=${discountedId}`),'1025');assert.equal(query(`SELECT amount FROM order_discounts WHERE order_id=${discountedId}`),'105');
  const winning=couponRace[0].status===302?c1:c2;await winning.c('checkout.php',winning.data);assert.equal(query('SELECT COUNT(*) FROM order_discounts'),'1','Retry must not use another code');
  let adminOrder=await owner('admin/order.php?id='+discountedId);await owner('admin/order.php?id='+discountedId,{csrf:token(adminOrder.html),status:'confirmed',delivery_fee:'80',payment_status:'unpaid',consignment_id:'TEST-PATHAO',tracking_url:'https://merchant.pathao.com/'});assert.equal(query(`SELECT total FROM orders WHERE id=${discountedId}`),'1025','Delivery change must retain discount');
  const discountedToken=query(`SELECT access_token FROM orders WHERE id=${discountedId}`);
@@ -225,13 +225,18 @@ try{
  // The two-hoodie offer is calculated on the server for both delivery zones.
  query(`UPDATE products SET active=1 WHERE id=${passion}`);
  query(`UPDATE variants SET stock=20 WHERE product_id=${passion} AND size='L'`);
- for(const area of ['dhaka','outside']){
+ for(const [price,qty,address,expected] of [
+  [900,2,'Bashundhara, DHAKA',0], [900,2,'Sylhet town centre',0],
+  [2000,1,'Sylhet town centre',120], [2000,1,'House 2, ঢাকা',80],
+  [2001,1,'Sylhet town centre',0], [2001,1,'Road 1, Dhaka',0]
+ ]){
+  query(`UPDATE products SET price=${price} WHERE id=${passion}`);
   const promo=client();let page=await promo('product.php?slug=fu-passion');
-  await promo('cart.php',{csrf:token(page.html),action:'add',product_id:passion,size:'L',quantity:'2'});
-  page=await promo('checkout.php');assert.match(page.html,/Free delivery applied/);assert.match(page.html,/id="delivery-amount">FREE/);
-  const placed=await promo('checkout.php',{...data,csrf:token(page.html),checkout_key:page.html.match(/name="checkout_key" value="([^"]+)"/)[1],area,delivery_fee:'999'});
-  assert.equal(placed.status,302);assert.equal(query('SELECT delivery_fee FROM orders ORDER BY id DESC LIMIT 1'),'0');
-  assert.equal(query('SELECT total=subtotal FROM orders ORDER BY id DESC LIMIT 1'),'1');
+  await promo('cart.php',{csrf:token(page.html),action:'add',product_id:passion,size:'L',quantity:String(qty)});
+  page=await promo('checkout.php');if(expected===0)assert.match(page.html,/id="delivery-amount">FREE/);
+  const placed=await promo('checkout.php',{...data,csrf:token(page.html),checkout_key:page.html.match(/name="checkout_key" value="([^"]+)"/)[1],address,delivery_fee:'999'});
+  assert.equal(placed.status,302);assert.equal(query('SELECT delivery_fee FROM orders ORDER BY id DESC LIMIT 1'),String(expected));
+  assert.equal(query('SELECT total FROM orders ORDER BY id DESC LIMIT 1'),String(price*qty+expected));
  }
  let visibilityPage=await owner('admin/products.php?id='+living);
  const visibilityData={csrf:token(visibilityPage.html),id:living,action:'visibility',visible:'0'};

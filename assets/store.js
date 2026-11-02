@@ -195,3 +195,20 @@ document.querySelector('[data-ticker-pause]')?.addEventListener('click',event=>{
  const button=event.currentTarget,paused=button.closest('.delivery-ticker').classList.toggle('paused');
  button.setAttribute('aria-pressed',String(paused));button.setAttribute('aria-label',paused?'Resume announcement animation':'Pause announcement animation');button.textContent=paused?'▶':'Ⅱ';
 });
+
+const deliveryForm = document.getElementById('checkout-form');
+if (deliveryForm) {
+  const address = deliveryForm.elements.address;
+  const updateDelivery = () => {
+    const text = address.value.trim();
+    const isDhaka = /(^|[^a-z])dhaka(?![a-z])|ঢাকা/iu.test(text);
+    const fee = deliveryForm.dataset.free === '1' ? 0 : text ? Number(isDhaka ? deliveryForm.dataset.dhaka : deliveryForm.dataset.outside) : null;
+    const money = amount => '৳' + amount.toLocaleString('en-US');
+    const subtotal = Number(document.getElementById('checkout-subtotal').dataset.subtotal);
+    document.getElementById('delivery-amount').textContent = fee === null ? 'Enter address' : fee === 0 ? 'FREE' : money(fee);
+    document.getElementById('checkout-total').textContent = fee === null ? 'Enter address' : money(subtotal + fee);
+  };
+  address.addEventListener('input', updateDelivery);
+  window.addEventListener('pageshow', updateDelivery);
+  updateDelivery();
+}
