@@ -25,6 +25,19 @@ function csrf(): string { return $_SESSION['csrf'] ??= bin2hex(random_bytes(32))
 function csrf_input(): string { return '<input type="hidden" name="csrf" value="'.h(csrf()).'">'; }
 function check_csrf(): void { if(!hash_equals(csrf(),(string)($_POST['csrf']??''))) { http_response_code(403); exit('Your session expired. Refresh the page and try again.'); } }
 function money($n): string { return '৳'.number_format((int)$n); }
+function hoodie_sale_original(array $product): ?int {
+    return (int)$product['price'] === 799 && in_array($product['sku'], ['FU-PASSION','FU-LOST'], true) ? 1200 : null;
+}
+function sale_badge(array $product): string {
+    $original = hoodie_sale_original($product);
+    if ($original === null) return '';
+    $percent = number_format(100 * ($original - $product['price']) / $original, 2);
+    return '<b class="hoodie-sale-badge">'.$percent.'% OFF</b>';
+}
+function display_product_price(array $product): string {
+    $original = hoodie_sale_original($product);
+    return ($original ? '<del class="original-price">'.money($original).'</del> ' : '').money($product['price']);
+}
 function delivery_estimate_default(string $area):string {return $area==='dhaka'?'1–2 days':'2–3 days';}
 function setting(string $key): ?string { $row=query('SELECT value FROM settings WHERE name=?',[$key])->fetch();$value=$row?$row['value']:null;if(($value===null||$value==='')&&in_array($key,['delivery_estimate_dhaka','delivery_estimate_outside'],true))return delivery_estimate_default(substr($key,18));return $value; }
 function flash(string $message): void { $_SESSION['flash']=$message; }

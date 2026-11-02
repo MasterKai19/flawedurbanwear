@@ -4,13 +4,13 @@ require_once __DIR__.'/catalog.php';
 require_once __DIR__.'/photo-order.php';
 function initialize_store():void {
     try {
-        if(query("SELECT value FROM settings WHERE name='installation_version'")->fetchColumn()==='7')return;
+        if(query("SELECT value FROM settings WHERE name='installation_version'")->fetchColumn()==='8')return;
     } catch(PDOException $e) { if($e->getCode()!=='42S02')throw $e; }
     $lock='flawed_install_'.substr(hash('sha256',(string)$GLOBALS['config']['db_name']),0,32);
     if((int)query('SELECT GET_LOCK(?,15)',[$lock])->fetchColumn()!==1)throw new RuntimeException('Initialization busy. Retry shortly.');
     try {
         install_schema('schema.sql');install_schema('cloud.sql');install_schema('notifications.sql');install_schema('commerce.sql');
-        if(query("SELECT value FROM settings WHERE name='installation_version'")->fetchColumn()==='7')return;
+        if(query("SELECT value FROM settings WHERE name='installation_version'")->fetchColumn()==='8')return;
         $hasOwner=(int)query('SELECT COUNT(*) FROM admins')->fetchColumn()>0;
         $email=trim((string)getenv('OWNER_EMAIL'));
         $password=(string)getenv('OWNER_PASSWORD');
@@ -21,8 +21,12 @@ function initialize_store():void {
         if(!$hasOwner)query('INSERT INTO admins(email,password_hash) VALUES(?,?)',[$email,password_hash($password,PASSWORD_DEFAULT)]);
         $previous=(int)setting('installation_version');
         if($previous<4){seed_catalog();arrange_catalog_photos();}
-        remove_catalog_mockups();
-        query("INSERT INTO settings(name,value) VALUES('installation_version','7') ON DUPLICATE KEY UPDATE value='7'");
+        if ($previous < 7) remove_catalog_mockups();
+        if (!setting('passion_lost_sale_applied')) {
+            query("UPDATE products SET price=799 WHERE sku IN ('FU-PASSION','FU-LOST')");
+            query("INSERT INTO settings(name,value) VALUES('passion_lost_sale_applied','1')");
+        }
+        query("INSERT INTO settings(name,value) VALUES('installation_version','8') ON DUPLICATE KEY UPDATE value='8'");
         db()->commit();
     } catch(Throwable $e) {
         if(db()->inTransaction())db()->rollBack();

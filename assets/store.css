@@ -164,3 +164,6 @@ body.bag-is-open{overflow:hidden}#bag-drawer{color:#f4f4f5;background:#101012;bo
 .delivery-ticker:hover .delivery-ticker-track,.delivery-ticker:focus-within .delivery-ticker-track,.delivery-ticker.paused .delivery-ticker-track{animation-play-state:paused}
 @keyframes delivery-news{to{transform:translateX(-50%)}}
 @media(prefers-reduced-motion:reduce){.delivery-ticker-track{animation:none}.delivery-ticker-track>span{width:auto;flex-basis:auto;padding:0 14px}.delivery-ticker-track>span~span,.delivery-ticker button,.delivery-ticker-track i{display:none}}
+
+.hoodie-sale-badge{position:absolute;top:10px;left:10px;z-index:3;padding:6px 9px;background:#bd1829;color:#fff;font:700 11px/1.2 Arial,sans-serif;letter-spacing:.05em;pointer-events:none}
+.original-price{font-size:.8em;font-weight:400;opacity:.75;white-space:nowrap}

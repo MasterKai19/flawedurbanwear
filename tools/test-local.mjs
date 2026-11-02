@@ -47,7 +47,7 @@ try{
  assert.equal(query('SELECT COUNT(*) FROM cloud_sessions'),'0','Anonymous homepage must not create a database session');
  query("UPDATE settings SET value='1' WHERE name='installation_version'");
  r=await owner('');assert.equal(r.status,200);
- assert.equal(query("SELECT value FROM settings WHERE name='installation_version'"),'7','Existing stores migrate safely');
+ assert.equal(query("SELECT value FROM settings WHERE name='installation_version'"),'8','Existing stores migrate safely');
  assert.equal(query("SELECT image FROM products WHERE sku='FU-LIVING'"),'assets/products/fu-living-01.jpg');
  assert.equal(query("SELECT image FROM products WHERE sku='FU-MIRACLE'"),'assets/products/fu-miracle-05.jpg');
  assert.equal(query("SELECT COUNT(*) FROM products WHERE sku='FU-PASSION' AND back_image IS NULL"),'1');
@@ -82,7 +82,7 @@ try{
  const data={csrf:token(r.html),checkout_key:checkoutKey,name:'Test Customer',phone:'01712345678',address:'Test delivery address Dhaka',agree:'1'};
  r=await buyer('checkout.php',data);assert.equal(r.status,302,r.html);
  assert.equal(query(`SELECT stock FROM variants WHERE product_id=${passion} AND size='L'`),'2');
- assert.equal(query('SELECT total FROM orders'),'1130');assert.equal(query('SELECT delivery_fee FROM orders'),'80');assert.equal(query('SELECT area FROM orders'),'dhaka');
+ assert.equal(query('SELECT total FROM orders'),'879');assert.equal(query('SELECT delivery_fee FROM orders'),'80');assert.equal(query('SELECT area FROM orders'),'dhaka');
  assert.equal(query('SELECT COUNT(*) FROM order_notifications'),'1');
  r=await buyer('checkout.php',data);assert.equal(r.status,302);assert.equal(query('SELECT COUNT(*) FROM orders'),'1','Duplicate checkout must not create another order');
  // Public tracking requires both details and does not reveal private fields.
@@ -189,7 +189,7 @@ try{
  console.log('PASS: remembered login across browser sessions/instances, multiple devices, cookie flags, logout revocation, forged/expired tokens.');
  // Additive v4 migration must preserve an owner's photo ordering.
  query("UPDATE products SET image='assets/products/fu-living-02.jpg' WHERE sku='FU-LIVING'");query("UPDATE settings SET value='4' WHERE name='installation_version'");await buyer('');
- assert.equal(query("SELECT image FROM products WHERE sku='FU-LIVING'"),'assets/products/fu-living-02.jpg');assert.equal(query("SELECT value FROM settings WHERE name='installation_version'"),'7');
+ assert.equal(query("SELECT image FROM products WHERE sku='FU-LIVING'"),'assets/products/fu-living-02.jpg');assert.equal(query("SELECT value FROM settings WHERE name='installation_version'"),'8');
  let toolsPage=await owner('admin/growth.php?tab=coupons');assert.equal(toolsPage.status,200);
  assert.equal((await other('admin/growth.php')).status,302);
  let create=await owner('admin/growth.php?tab=coupons',{csrf:token(toolsPage.html),action:'coupon',code:'TEST-ONE',kind:'percent',amount:'10',min_spend:'100',max_uses:'1',expires:'2099-12-31'});assert.equal(create.status,302);
